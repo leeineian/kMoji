@@ -6,9 +6,9 @@ A panel-integrated emote selector for Plasma 6.
 
 ```fish
 # Install or update the plasmoid from this folder
-kpackagetool6 -t Plasma/Applet -i .local/share/plasma/plasmoids/emote.selector.plus
+kpackagetool6 -t Plasma/Applet -i ~/PATH/TO/emote.selector.plus
 # If already installed, use -u to update
-kpackagetool6 -t Plasma/Applet -u .local/share/plasma/plasmoids/emote.selector.plus
+kpackagetool6 -t Plasma/Applet -u ~/PATH/TO/emote.selector.plus
 ```
 
 ## Run in a window
@@ -20,7 +20,7 @@ plasmawindowed emote.selector.plus
 ## Notes
 - Requires Plasma 6 (KF6) and Qt 6.
 - Clipboard uses KDE KQuickControlsAddons. Ensure the `org.kde.kquickcontrolsaddons` QML module is present.
-- Emoji data is loaded from `assets/emoji-list.js` (auto-generated from `emoji-list.json`).
+- Emoji data is loaded from `assets/emoji-list.js`
 
 ## Updating Emoji Data
 
@@ -43,4 +43,4 @@ During sync the script writes markers to the log file the UI polls:
 - `SYNC_COMPLETE` – Successful completion.
 
 ### Checksum
-The generated `emoji-list.js` header now includes a `SHA256` line for the source `emoji-test.txt` file for reproducibility. The raw `emoji-test.txt` is deleted after a successful sync to save space.
+The generated `emoji-list.js` header includes a `SHA256` line for the source `emoji-test.txt`. The raw `emoji-test.txt` is deleted after a successful sync.
