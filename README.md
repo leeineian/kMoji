@@ -27,13 +27,6 @@ plasmawindowed emote.selector.plus
 To update the emoji list:
 You can use either the Python script or the Bash script.
 
-### Option A: Python
-Regenerate `assets/emoji-list.js` with the latest emoji data from https://unicode.org/Public/emoji/latest/emoji-test.txt:
-```fish
-python3 contents/service/update_emoji.py
-```
-
-### Option B: Bash
 Make sure the script is executable (once):
 ```fish
 chmod +x contents/service/update_emoji.sh
