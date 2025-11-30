@@ -1,6 +1,16 @@
-# <img src="./emote.svg" width="30" align="middle" alt="emote"/> Emote Selector Plus
+<br />
+<div align="center">
+  <a href="https://github.com/ethncldemnts/emote.selector.plus">
+    <img src="./icon.svg" alt="Logo" width="80" height="80">
+  </a>
 
-A panel-integrated emote selector for Plasma 6.
+  <h1 align="center">Emote Selector Plus</h1>
+
+  <p align="center">
+    A panel-integrated emote selector for KDE Plasma 6.
+    <br />
+  </p>
+</div>
 
 ## Install/Update
 
