@@ -1,5 +1,5 @@
 // Generated from: https://unicode.org/Public/emoji/latest/emoji-test.txt
-// Generated on: 2025-12-06T11:25:38Z
+// Generated on: 2025-12-06T23:36:40Z
 // SHA256: 1d8a944f88d7952f7ef7c5167fef3c67995bcae24543949710231b03a201acda
 
 const emojiList = {

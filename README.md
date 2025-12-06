@@ -1,7 +1,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/ethncldemnts/emote.selector.plus">
-    <img src="./emote.svg" alt="Emote" width="80" height="80">
+    <img src="./logo.svg" alt="Emote" width="80" height="80">
   </a>
 
   <h3 align="center">Emote Selector Plus</h3>
