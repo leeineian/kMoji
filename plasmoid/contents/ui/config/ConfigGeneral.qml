@@ -19,7 +19,6 @@ Kirigami.ScrollablePage {
 
     property string smallSizeEmojiLabel: i18n("Small")
     property string largeSizeEmojiLabel: i18n("Large")
-    readonly property var emojiIconPool: EmojiIcons.getIconEmojis() || []
 
     // Helper to calculate font size based on grid size
     function emojiFontPixelSize(gridSize) {
@@ -29,10 +28,11 @@ Kirigami.ScrollablePage {
     }
 
     function _randomEmojiFromPool() {
-        if (!root.emojiIconPool || root.emojiIconPool.length === 0) {
+        const pool = EmojiIcons.getIconEmojis() || []
+        if (pool.length === 0) {
             return null
         }
-        return root.emojiIconPool[Math.floor(Math.random() * root.emojiIconPool.length)]
+        return pool[Math.floor(Math.random() * pool.length)]
     }
 
     function rollSizeEmojiLabels() {
