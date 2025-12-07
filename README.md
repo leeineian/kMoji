@@ -14,11 +14,27 @@
 
 ## Quick install
 
+Using the install script:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/leeineian/kMoji/master/scripts/get.sh | bash
+```
 
+Using with install script with options:
+```bash
 # With options:
 curl -fsSL https://raw.githubusercontent.com/leeineian/kMoji/master/scripts/get.sh | bash -s -- --verbose
+```
+
+## 🗑️ Uninstalling
+
+Using the uninstall script:
+```bash
+./scripts/install.sh --uninstall
+```
+
+Or with curl:
+```bash
+curl -fsSL https://raw.githubusercontent.com/leeineian/kMoji/master/scripts/get.sh | bash -s -- --uninstall
 ```
 
 ## Run in a window
