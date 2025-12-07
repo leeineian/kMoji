@@ -147,7 +147,7 @@ Kirigami.ScrollablePage {
                 }
 
                 PlasmaComponents.ToolButton {
-                    icon.name: "help-hint-symbolic"
+                    icon.name: "data-information"
                     text: i18n("Help")
                     display: PlasmaComponents.ToolButton.IconOnly
 
@@ -191,7 +191,7 @@ Kirigami.ScrollablePage {
 
             ScrollView {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Kirigami.Units.gridUnit * 6
+                Layout.preferredHeight: syncController.logAreaHeight
                 visible: syncController.logVisible
                 
                 background: Rectangle {
@@ -211,6 +211,49 @@ Kirigami.ScrollablePage {
                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                     selectByMouse: true
                     color: PlasmaCore.Theme.textColor
+                }
+            }
+
+            // Resize Handle
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Kirigami.Units.largeSpacing
+                visible: syncController.logVisible
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: Kirigami.Units.gridUnit * 2
+                    height: Math.round(Kirigami.Units.smallSpacing / 2)
+                    radius: height / 2
+                    color: PlasmaCore.Theme.textColor
+                    opacity: 0.3
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.SizeVerCursor
+                    // Prevent parent ScrollView (the page) from stealing the drag
+                    preventStealing: true
+
+                    property real startY: 0
+
+                    onPressed: (mouse) => {
+                        startY = mouse.y
+                    }
+
+                    onPositionChanged: (mouse) => {
+                        const delta = mouse.y - startY
+                        let newHeight = syncController.logAreaHeight + delta
+                        
+                        // Constraints
+                        const minHeight = Kirigami.Units.gridUnit * 3
+                        const maxHeight = root.height * 0.8
+
+                        if (newHeight < minHeight) newHeight = minHeight
+                        if (newHeight > maxHeight) newHeight = maxHeight
+                        
+                        syncController.logAreaHeight = newHeight
+                    }
                 }
             }
         }
@@ -252,6 +295,7 @@ Kirigami.ScrollablePage {
         property string statusText: i18n("Sync Emoji Database")
         property string logText: ""
         property bool logVisible: false
+        property real logAreaHeight: Kirigami.Units.gridUnit * 6
         property string currentCommand: ""
 
         function appendLog(message) {
