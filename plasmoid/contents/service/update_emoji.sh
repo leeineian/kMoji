@@ -165,7 +165,7 @@ awk \
         if (!first) printf ",";\
         first = 0;\
 \
-        printf "\n  {\"emoji\": \"%s\", \"name\": \"%s\", \"aliases\": [\"%s\"], \"tags\": []}", emoji, name, alias;\
+        printf "\n  {\"emoji\": \"%s\", \"name\": \"%s\", \"aliases\": [\"%s\"]}", emoji, name, alias;\
       }\
     }\
   }\
