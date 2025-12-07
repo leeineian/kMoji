@@ -26,7 +26,7 @@ URL="https://unicode.org/Public/emoji/latest/emoji-test.txt"
 SERVICE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ASSETS_DIR="$(cd "$SERVICE_DIR/../assets" && pwd)"
 
-RAW_FILE_PATH="$ASSETS_DIR/emoji-test.txt"
+RAW_FILE_PATH="$(mktemp)"
 JS_FILE_PATH="$ASSETS_DIR/emoji-list.js"
 
 trap 'rm -f "$RAW_FILE_PATH"' EXIT
@@ -146,10 +146,8 @@ awk \
 
         # Generate Alias
         alias = tolower(name);
-        gsub(/ /, "_", alias);
-        gsub(/-/, "_", alias);
-        gsub(/:/, "", alias);
-        gsub(/\./, "", alias);
+        gsub(/[ -]/, "_", alias);
+        gsub(/[:.]/, "", alias);
         # Remove non-alphanumeric characters from start and end
         gsub(/^[^a-z0-9]+|[^a-z0-9]+$/, "", alias);
 
