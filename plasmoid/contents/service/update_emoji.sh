@@ -132,17 +132,26 @@ awk \
       # content after "# " is "😀 E1.0 grinning face"
       rest = substr($0, idx + 2);
 
-      # Find " E<version> "
-      # Regex: space + E + digits/dots + space
-      match(rest, / E[0-9.]+ /);
+      # Robust parsing: split by whitespace.
+      # Field 1 is emoji. Field 2 might be version (E1.0). Rest is name.
+      n = split(rest, parts, " ");
 
-      if (RSTART > 0) {
-        # emoji is before the match
-        emoji = substr(rest, 1, RSTART - 1);
-        
-        # name is after the match
-        # RLENGTH is length of " E1.0 "
-        name = substr(rest, RSTART + RLENGTH);
+      if (n >= 2) {
+        emoji = parts[1];
+
+        # Determine where the name starts
+        # Check if parts[2] looks like a version (E1.0, E12.1, etc.)
+        if (parts[2] ~ /^E[0-9.]+$/) {
+          name_start = 3;
+        } else {
+          name_start = 2;
+        }
+
+        # Reconstruct name
+        name = "";
+        for (i = name_start; i <= n; i++) {
+          name = (name == "" ? "" : name " ") parts[i];
+        }
 
         # Generate Alias
         alias = tolower(name);
