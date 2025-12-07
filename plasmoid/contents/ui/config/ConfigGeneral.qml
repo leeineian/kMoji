@@ -286,7 +286,8 @@ Kirigami.ScrollablePage {
         id: syncController
 
         property bool isSyncing: false
-        property string statusText: i18n("Sync Emoji Database")
+        readonly property string defaultStatusText: i18n("Sync Emoji Database")
+        property string statusText: defaultStatusText
         property string logText: ""
         property bool logVisible: false
         property real logAreaHeight: Kirigami.Units.gridUnit * 6
@@ -377,7 +378,7 @@ Kirigami.ScrollablePage {
         interval: 3000
         onTriggered: {
             if (!syncController.isSyncing) {
-                syncController.statusText = i18n("Sync Emoji Database")
+                syncController.statusText = syncController.defaultStatusText
             }
         }
     }
