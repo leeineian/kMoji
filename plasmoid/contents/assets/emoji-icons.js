@@ -2,7 +2,13 @@
 .import "emoji-list.js" as EmojiSource
 
 // Dynamically populate iconEmojis from the shared emoji list
-var iconEmojis = (function() {
+var _cachedEmojis = null;
+
+function getIconEmojis() {
+    if (_cachedEmojis) {
+        return _cachedEmojis;
+    }
+
     var allEmojis = [];
     var list = EmojiSource.emojiList;
     
@@ -15,5 +21,6 @@ var iconEmojis = (function() {
         }
     }
     
+    _cachedEmojis = allEmojis;
     return allEmojis;
-})();
+}

@@ -693,7 +693,7 @@ Item {
     Component.onCompleted: {
         loadRecentEmojis()
         loadFavoriteEmojis()
-        loadEmojis()
+        Qt.callLater(loadEmojis)
 
         fullRoot.resetSearchPlaceholder()
         fullRoot.emojiViewModel = fullRoot.filteredEmojis
@@ -801,6 +801,15 @@ Item {
     }
 
     Timer {
+        id: searchDebounceTimer
+        interval: 200 // 200ms debounce
+        repeat: false
+        onTriggered: {
+            fullRoot.filter = searchField.text
+        }
+    }
+
+    Timer {
         id: pastePlaceholderResetTimer
         interval: 2000
         running: false
@@ -863,7 +872,7 @@ Item {
                         KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? emojiGridView : null
 
                         onTextChanged: {
-                            fullRoot.filter = text
+                            searchDebounceTimer.restart()
                         }
 
                         onActiveFocusChanged: {

@@ -19,7 +19,7 @@ MouseArea {
     property bool wasExpanded: false
     property var plasmoidItem: null
     property bool easterEggMode: false
-    property var emojiIcons: IconEmojis.iconEmojis
+    property var emojiIcons: []
     property int currentEmojiIndex: 0
 
     // Size hints for panel layout - use system default icon size
@@ -69,7 +69,12 @@ MouseArea {
     onEntered: {
         const target = expander()
         if (!target || !target.expanded) {
-            currentEmojiIndex = Math.floor(Math.random() * emojiIcons.length)
+            if (emojiIcons.length === 0) {
+                emojiIcons = IconEmojis.getIconEmojis()
+            }
+            if (emojiIcons.length > 0) {
+                currentEmojiIndex = Math.floor(Math.random() * emojiIcons.length)
+            }
         }
     }
 
@@ -98,7 +103,7 @@ MouseArea {
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
 
-            text: compactRoot.emojiIcons[compactRoot.currentEmojiIndex]
+            text: (compactRoot.emojiIcons && compactRoot.emojiIcons.length > 0) ? compactRoot.emojiIcons[compactRoot.currentEmojiIndex] : ""
             font.pixelSize: Math.min(width, height) * 0.8
             font.family: "emoji" // Use emoji font family if available
 

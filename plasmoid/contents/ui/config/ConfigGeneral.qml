@@ -19,7 +19,7 @@ Kirigami.ScrollablePage {
 
     property string smallSizeEmojiLabel: i18n("Small")
     property string largeSizeEmojiLabel: i18n("Large")
-    readonly property var emojiIconPool: EmojiIcons.iconEmojis || []
+    readonly property var emojiIconPool: EmojiIcons.getIconEmojis() || []
 
     // Helper to calculate font size based on grid size
     function emojiFontPixelSize(gridSize) {
