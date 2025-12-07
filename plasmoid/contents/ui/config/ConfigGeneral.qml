@@ -55,7 +55,7 @@ Kirigami.ScrollablePage {
         PlasmaComponents.Label {
             id: label
             font.bold: true
-            font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.1
+            font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.2
             Layout.alignment: Qt.AlignHCenter
         }
         Kirigami.Separator {
