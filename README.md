@@ -25,7 +25,13 @@ Using with install script with options:
 curl -fsSL https://raw.githubusercontent.com/leeineian/kMoji/master/scripts/get.sh | bash -s -- --verbose
 ```
 
-## 🗑️ Uninstalling
+## Run in a window
+
+```fish
+plasmawindowed org.kmoji.plasma
+```
+
+## Uninstallation
 
 Using the uninstall script:
 ```bash
@@ -35,12 +41,6 @@ Using the uninstall script:
 Or with curl:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/leeineian/kMoji/master/scripts/get.sh | bash -s -- --uninstall
-```
-
-## Run in a window
-
-```fish
-plasmawindowed org.kmoji.plasma
 ```
 
 ## Notes
