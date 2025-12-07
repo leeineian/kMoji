@@ -29,7 +29,6 @@ ASSETS_DIR="$(cd "$SERVICE_DIR/../assets" && pwd)"
 RAW_FILE_PATH="$ASSETS_DIR/emoji-test.txt"
 JS_FILE_PATH="$ASSETS_DIR/emoji-list.js"
 
-# Ensure cleanup happens on exit
 trap 'rm -f "$RAW_FILE_PATH"' EXIT
 
 echo "SYNC_STARTED"
@@ -81,14 +80,11 @@ echo "SHA256 checksum: $checksum"
 # ==============================================================================
 echo "Parsing and generating JSON..."
 
-# Prepare JS Header
 DATE_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 HEADER="// Generated from: $URL\n// Generated on: $DATE_ISO\n// SHA256: $checksum\n\nconst emojiList = "
 
-# Write Header
 printf "%b" "$HEADER" > "$JS_FILE_PATH"
 
-# Parse with POSIX awk (direct JSON generation)
 awk \
   '
   BEGIN {
