@@ -48,6 +48,11 @@ if [ ! -d "$ASSETS_DIR" ]; then
   exit 1
 fi
 
+if [ ! -w "$ASSETS_DIR" ]; then
+  echo "Error: assets directory is not writable: $ASSETS_DIR" >&2
+  exit 3
+fi
+
 # ==============================================================================
 # Download
 # ==============================================================================

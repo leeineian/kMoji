@@ -20,6 +20,9 @@ Kirigami.ScrollablePage {
     property string smallSizeEmojiLabel: i18n("Small")
     property string largeSizeEmojiLabel: i18n("Large")
 
+    property alias cfg_CloseAfterSelection: closeAfterSelection.checked
+    property alias cfg_KeyboardNavigation: keyboardNavigation.checked
+
     // Helper to calculate font size based on grid size
     function emojiFontPixelSize(gridSize) {
         const size = gridSize || 0
@@ -132,18 +135,16 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
 
             PlasmaComponents.CheckBox {
+                id: closeAfterSelection
                 text: i18n("Close popup after emoji selection")
-                checked: plasmoid.configuration.CloseAfterSelection
-                onToggled: plasmoid.configuration.CloseAfterSelection = checked
             }
 
             RowLayout {
                 spacing: Kirigami.Units.smallSpacing
 
                 PlasmaComponents.CheckBox {
+                    id: keyboardNavigation
                     text: i18n("Enable keyboard navigation")
-                    checked: plasmoid.configuration.KeyboardNavigation
-                    onToggled: plasmoid.configuration.KeyboardNavigation = checked
                 }
 
                 PlasmaComponents.ToolButton {
@@ -317,18 +318,38 @@ Kirigami.ScrollablePage {
             isSyncing = true
             statusText = i18n("Syncing...")
             logVisible = true
-            logText = "" 
-            addSystemLog("Sync started...")
+            logText = ""
 
             executeScript()
         }
 
         function executeScript() {
             const scriptUrl = Qt.resolvedUrl('../../service/update_emoji.sh')
-            // Robust path handling: remove file:// scheme and decode URI components (e.g. %20 -> space)
-            const cleanPath = decodeURIComponent(scriptUrl.toString().replace(/^file:\/\//, ''))
+            let path = scriptUrl.toString()
+
+            // Strip protocol robustly
+            if (path.startsWith("file://")) {
+                path = path.substring(7)
+            } else if (path.startsWith("file:")) {
+                path = path.substring(5)
+            }
+
+            // Decode path (e.g. spaces -> %20 handled)
+            const cleanPath = decodeURIComponent(path)
             
             addSystemLog(`Script: ${cleanPath}`)
+
+            // Check if path looks valid (basic sanity check)
+            if (cleanPath.length === 0 || cleanPath.includes("undefined")) {
+                 addSystemLog("Error: Could not resolve script path.")
+                 finishSync(1)
+                 return
+            }
+
+            // Safety: Disconnect previous command if valid to prevent dangling connections
+            if (currentCommand !== "") {
+                shellSource.disconnectSource(currentCommand)
+            }
 
             // Command: Run script directly
             // We use bash explicitly
@@ -341,9 +362,17 @@ Kirigami.ScrollablePage {
             currentCommand = ""
             
             const isSuccess = (exitCode === 0)
-            statusText = isSuccess ? i18n("Sync Complete!") : i18n("Sync failed (%1)", exitCode)
             
-            addSystemLog(isSuccess ? "Process finished successfully." : `Process failed with code ${exitCode}.`)
+            if (isSuccess) {
+                statusText = i18n("Sync Complete!")
+                addSystemLog("Process finished successfully.")
+            } else if (exitCode === 3) {
+                statusText = i18n("Error: Read-only Filesystem")
+                addSystemLog("Failed: Cannot write to assets directory. Is the plasmoid installed system-wide?")
+            } else {
+                statusText = i18n("Sync failed (%1)", exitCode)
+                addSystemLog(`Process failed with code ${exitCode}.`)
+            }
 
             // Reset button text after delay
             resetStatusTimer.restart()
