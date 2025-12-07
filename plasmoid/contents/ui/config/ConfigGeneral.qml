@@ -23,7 +23,6 @@ Kirigami.ScrollablePage {
     property alias cfg_CloseAfterSelection: closeAfterSelection.checked
     property alias cfg_KeyboardNavigation: keyboardNavigation.checked
 
-    // Helper to calculate font size based on grid size
     function emojiFontPixelSize(gridSize) {
         const size = gridSize || 0
         const scaled = Math.floor(size * 0.7)
@@ -106,7 +105,6 @@ Kirigami.ScrollablePage {
 
                     readonly property var sizeValues: [36, 44, 56]
 
-                    // Bind value to config, fallback to Medium (index 1)
                     value: {
                         const current = plasmoid.configuration.GridSize
                         if (current <= 36) return 0
@@ -162,9 +160,9 @@ Kirigami.ScrollablePage {
             }
         }
 
-        // --- Sync Section ---
+        // --- Update Section ---
         ConfigSection {
-            text: i18n("Sync")
+            text: i18n("Update")
         }
 
         // We use a simplified GroupBox-like look for the logs area
@@ -233,7 +231,6 @@ Kirigami.ScrollablePage {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.SizeVerCursor
-                    // Prevent parent ScrollView (the page) from stealing the drag
                     preventStealing: true
 
                     property real startY: 0
@@ -246,7 +243,6 @@ Kirigami.ScrollablePage {
                         const delta = mouse.y - startY
                         let newHeight = syncController.logAreaHeight + delta
                         
-                        // Constraints
                         const minHeight = Kirigami.Units.gridUnit * 3
                         const maxHeight = root.height * 0.8
 
@@ -270,18 +266,15 @@ Kirigami.ScrollablePage {
         connectedSources: []
 
         onNewData: (source, data) => {
-            // Only handle the current sync command
             if (source !== syncController.currentCommand) return
 
             const stdout = data["stdout"]
             const stderr = data["stderr"]
             const exitCode = data["exit code"]
 
-            // Append Output
             if (stdout) syncController.appendLog(stdout)
             if (stderr) syncController.appendLog(stderr)
 
-            // Check for process termination
             if (exitCode !== undefined) {
                 disconnectSource(source)
                 syncController.finishSync(exitCode)
@@ -301,7 +294,6 @@ Kirigami.ScrollablePage {
 
         function appendLog(message) {
             logText += message
-            // Auto scroll to bottom
             Qt.callLater(() => {
                 if(syncLogArea) syncLogArea.cursorPosition = syncLogArea.length
             })
@@ -351,8 +343,6 @@ Kirigami.ScrollablePage {
                 shellSource.disconnectSource(currentCommand)
             }
 
-            // Command: Run script directly
-            // We use bash explicitly
             currentCommand = `bash "${cleanPath}"`
             shellSource.connectSource(currentCommand)
         }
@@ -374,7 +364,6 @@ Kirigami.ScrollablePage {
                 addSystemLog(`Process failed with code ${exitCode}.`)
             }
 
-            // Reset button text after delay
             resetStatusTimer.restart()
         }
     }
