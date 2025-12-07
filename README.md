@@ -7,7 +7,7 @@
   <h3 align="center">kMoji</h3>
 
   <p align="center">
-    A panel-integrated emote selector for KDE Plasma 6.
+    An integrated emote selector for KDE Plasma 6.
     <br />
   </p>
 </div>
