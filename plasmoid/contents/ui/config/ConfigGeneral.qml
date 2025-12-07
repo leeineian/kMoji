@@ -180,7 +180,11 @@ Kirigami.ScrollablePage {
                     id: syncButton
                     text: syncController.statusText
                     enabled: !syncController.isSyncing && syncController.statusText === syncController.defaultStatusText
-                    icon.name: syncController.isSyncing ? "view-refresh-symbolic" : "download"
+                    icon.name: {
+                        if (syncController.isSyncing) return "view-refresh-symbolic"
+                        if (syncController.resultIcon !== "") return syncController.resultIcon
+                        return "download-symbolic"
+                    }
                     
                     onClicked: syncController.startSync()
                 }
@@ -288,6 +292,7 @@ Kirigami.ScrollablePage {
         property bool isSyncing: false
         readonly property string defaultStatusText: i18n("Sync Emoji Database")
         property string statusText: defaultStatusText
+        property string resultIcon: ""
         property string logText: ""
         property bool logVisible: false
         property real logAreaHeight: Kirigami.Units.gridUnit * 6
@@ -310,6 +315,7 @@ Kirigami.ScrollablePage {
 
             isSyncing = true
             statusText = i18n("Syncing...")
+            resultIcon = ""
             logVisible = true
             logText = ""
 
@@ -356,12 +362,15 @@ Kirigami.ScrollablePage {
             
             if (isSuccess) {
                 statusText = i18n("Sync Complete!")
+                resultIcon = "checkmark-symbolic"
                 addSystemLog("Process finished successfully.")
             } else if (exitCode === 3) {
                 statusText = i18n("Error: Read-only Filesystem")
+                resultIcon = "action-unavailable-symbolic"
                 addSystemLog("Failed: Cannot write to assets directory. Is the plasmoid installed system-wide?")
             } else {
                 statusText = i18n("Sync failed (%1)", exitCode)
+                resultIcon = "action-unavailable-symbolic"
                 addSystemLog(`Process failed with code ${exitCode}.`)
             }
 
@@ -379,6 +388,7 @@ Kirigami.ScrollablePage {
         onTriggered: {
             if (!syncController.isSyncing) {
                 syncController.statusText = syncController.defaultStatusText
+                syncController.resultIcon = ""
             }
         }
     }
