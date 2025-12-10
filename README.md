@@ -10,6 +10,8 @@
     An integrated emote selector for KDE Plasma 6.
     <br />
   </p>
+  
+  ![](screens/1.png)
 </div>
 
 ## Quick install
