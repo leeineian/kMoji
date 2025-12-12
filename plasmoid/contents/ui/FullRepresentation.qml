@@ -9,6 +9,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.ksvg as KSvg
 import org.kde.plasma.components as PlasmaComponents
+import org.kde.plasma.components 3.0 as PC3
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 
@@ -662,10 +663,10 @@ Item {
         }
     }
 
-    function handleEmojiRightClicked(emoji, emojiObj, pos) {
+    function handleEmojiRightClicked(emoji, emojiObj, globalPos) {
         contextMenu.emoji = emoji
         contextMenu.emojiObj = emojiObj
-        contextMenu.popup(emojiGridView, pos.x, pos.y)
+        contextMenu.popup(globalPos.x, globalPos.y)
     }
 
     function loadDefaultCategories() {
@@ -820,16 +821,7 @@ Item {
                     return
             }
 
-            if (event.key === Qt.Key_Left || event.key === Qt.Key_Right ||
-                event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
-                if (!(event.modifiers & (Qt.AltModifier | Qt.MetaModifier))) {
-                    if (emojiGridView && typeof emojiHandleExternalArrowKey === "function") {
-                        var handled = emojiHandleExternalArrowKey(event.key)
-                        if (handled) event.accepted = true
-                            return
-                    }
-                }
-                }
+
 
                 if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) &&
                     !(event.modifiers & Qt.ControlModifier)) {
@@ -1005,10 +997,7 @@ Item {
                                 }
                         }
 
-                        Keys.onDownPressed: {
-                            fullRoot.handleEmojiNavigationFromTextInput(event)
-                            event.accepted = true
-                        }
+
 
                         Keys.onReleased: function(event) {
                             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
@@ -1019,13 +1008,6 @@ Item {
                         }
 
                         Keys.onPressed: function(event) {
-                            if (plasmoid.configuration.KeyboardNavigation &&
-                                (event.key === Qt.Key_Left || event.key === Qt.Key_Right ||
-                                event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
-                                var handled = fullRoot.handleEmojiNavigationFromTextInput(event)
-                                if (handled) event.accepted = true
-                                }
-
                                 if (plasmoid.configuration.KeyboardNavigation && event.key === Qt.Key_Escape) {
                                     if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
                                         event.accepted = true
@@ -1067,12 +1049,6 @@ Item {
                         }
 
                         Keys.onPressed: function(event) {
-                            if (plasmoid.configuration.KeyboardNavigation &&
-                                (event.key === Qt.Key_Left || event.key === Qt.Key_Right ||
-                                event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
-                                var handled = fullRoot.handleEmojiNavigationFromTextInput(event)
-                                if (handled) event.accepted = true
-                                }
 
                                 if (plasmoid.configuration.KeyboardNavigation && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
                                     const isShift = event.modifiers & Qt.ShiftModifier
@@ -1159,8 +1135,6 @@ Item {
                         activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                         KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? settingsButtonInSidebar : null
                         KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? pasteField : null
-                        KeyNavigation.down: plasmoid.configuration.KeyboardNavigation ? settingsButtonInSidebar : null
-                        KeyNavigation.right: plasmoid.configuration.KeyboardNavigation ? emojiGridView : null
 
 
 
@@ -1186,11 +1160,7 @@ Item {
                                     pinKeyboardFeedbackReset.restart()
                                     plasmoid.configuration.AlwaysOpen = !plasmoid.configuration.AlwaysOpen
                                     event.accepted = true
-                                } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right ||
-                                    event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
-                                    var handled = fullRoot.handleEmojiNavigationFromTextInput(event)
-                                    if (handled) event.accepted = true
-                                    }
+                                }
                         }
 
                         Keys.onReleased: function(event) {
@@ -1293,9 +1263,6 @@ Item {
                         activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                         KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? sidebarToggleButton : null
                         KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? pinButton : null
-                        KeyNavigation.down: plasmoid.configuration.KeyboardNavigation ? sidebarToggleButton : null
-                        KeyNavigation.up: plasmoid.configuration.KeyboardNavigation ? pinButton : null
-                        KeyNavigation.right: plasmoid.configuration.KeyboardNavigation ? emojiGridView : null
 
                         Timer {
                             id: settingsKeyboardFeedbackReset
@@ -1322,11 +1289,7 @@ Item {
                                     settingsKeyboardFeedbackReset.restart()
                                     openSettingsTimer.restart()
                                     event.accepted = true
-                                } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right ||
-                                    event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
-                                    var handled = fullRoot.handleEmojiNavigationFromTextInput(event)
-                                    if (handled) event.accepted = true
-                                    }
+                                }
                         }
 
                         Keys.onReleased: function(event) {
@@ -1429,9 +1392,6 @@ Item {
                         activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                         KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? settingsButtonInSidebar : null
                         KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (categoryListView.count > 0 ? (categoryListView.itemAtIndex(0) ? categoryListView.itemAtIndex(0) : emojiGridView) : emojiGridView) : null
-                        KeyNavigation.down: plasmoid.configuration.KeyboardNavigation ? (categoryListView.count > 0 ? (categoryListView.itemAtIndex(0) ? categoryListView.itemAtIndex(0) : emojiGridView) : emojiGridView) : null
-                        KeyNavigation.up: plasmoid.configuration.KeyboardNavigation ? settingsButtonInSidebar : null
-                        KeyNavigation.right: plasmoid.configuration.KeyboardNavigation ? emojiGridView : null
 
 
 
@@ -1448,11 +1408,7 @@ Item {
                                     fullRoot.sidebarButtonKeyboardPressed = true
                                     fullRoot.sidebarExpanded = !fullRoot.sidebarExpanded
                                     event.accepted = true
-                                } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right ||
-                                    event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
-                                    var handled = fullRoot.handleEmojiNavigationFromTextInput(event)
-                                    if (handled) event.accepted = true
-                                    }
+                                }
                         }
 
                         Keys.onReleased: function(event) {
@@ -1578,11 +1534,9 @@ Item {
                             // Keyboard Navigation Logic
                             KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (index + 1 < categoryListView.count ? (categoryListView.itemAtIndex(index + 1) ? categoryListView.itemAtIndex(index + 1) : emojiGridView) : emojiGridView) : null
                             KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? (index === 0 ? sidebarToggleButton : (categoryListView.itemAtIndex(index - 1) ? categoryListView.itemAtIndex(index - 1) : sidebarToggleButton)) : null
-                            KeyNavigation.down: plasmoid.configuration.KeyboardNavigation ? (index + 1 < categoryListView.count ? (categoryListView.itemAtIndex(index + 1) ? categoryListView.itemAtIndex(index + 1) : emojiGridView) : emojiGridView) : null
-                            KeyNavigation.up: plasmoid.configuration.KeyboardNavigation ? (index === 0 ? sidebarToggleButton : (categoryListView.itemAtIndex(index - 1) ? categoryListView.itemAtIndex(index - 1) : sidebarToggleButton)) : null
-                            KeyNavigation.right: plasmoid.configuration.KeyboardNavigation ? emojiGridView : null
 
-
+                            Keys.onReturnPressed: clicked()
+                            Keys.onEnterPressed: clicked()
 
                             opacity: fullRoot.isCategoryDragging(index) ? 0.3 : 1.0
                             
@@ -1702,10 +1656,11 @@ Item {
 
                                 onClicked: {
                                     if (mouse.button === Qt.RightButton) {
+                                        var globalPos = mapToItem(fullRoot, mouse.x, mouse.y)
                                         if (model.name === "Recent") {
-                                            recentContextMenu.popup(dragArea, mouse.x, mouse.y)
+                                            recentContextMenu.popup(globalPos.x, globalPos.y)
                                         } else if (model.name === "Favorites") {
-                                            favoritesContextMenu.popup(dragArea, mouse.x, mouse.y)
+                                            favoritesContextMenu.popup(globalPos.x, globalPos.y)
                                         }
                                         mouse.accepted = true
                                     } else if (!fullRoot.isCategoryDragging(index)) {
@@ -1750,7 +1705,7 @@ Item {
                         keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
                         keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
 
-
+                        property int keyboardPressedIndex: -1
 
                         Timer {
                             id: mouseOverExitTimer
@@ -1821,14 +1776,9 @@ Item {
                             if (!fullRoot.emojiKeyboardNavigationEnabled) return
 
                                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select) {
+                                    emojiGridView.keyboardPressedIndex = currentIndex
                                     fullRoot.gridKeyboardActionPressed = true
-                                    if (currentIndex >= 0 && currentIndex < fullRoot.emojiViewModel.length) {
-                                        const item = fullRoot.emojiViewModel[currentIndex]
-                                        const isCtrl = event.modifiers & Qt.ControlModifier
-                                        const isShift = event.modifiers & Qt.ShiftModifier
-                                        handleEmojiSelected(item.emoji, isCtrl, isShift)
-                                        event.accepted = true
-                                    }
+                                    event.accepted = true
                                 } else if (event.key === Qt.Key_Space) {
                                     if (currentIndex >= 0 && currentIndex < fullRoot.emojiViewModel.length) {
                                         const item = fullRoot.emojiViewModel[currentIndex]
@@ -1858,7 +1808,15 @@ Item {
                             if (fullRoot.emojiKeyboardNavigationEnabled &&
                                 (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select)) {
                                 fullRoot.gridKeyboardActionPressed = false
+                                emojiGridView.keyboardPressedIndex = -1
+                                if (currentIndex >= 0 && currentIndex < fullRoot.emojiViewModel.length) {
+                                    const item = fullRoot.emojiViewModel[currentIndex]
+                                    const isCtrl = event.modifiers & Qt.ControlModifier
+                                    const isShift = event.modifiers & Qt.ShiftModifier
+                                    handleEmojiSelected(item.emoji, isCtrl, isShift)
+                                    event.accepted = true
                                 }
+                            }
                         }
 
                         onActiveFocusChanged: {
@@ -1877,6 +1835,10 @@ Item {
                                     } else {
                                         updateKeyboardHover()
                                     }
+                                }
+                            } else if (!activeFocus) {
+                                if (!fullRoot.gridIsMouseOver) {
+                                    clearKeyboardHover()
                                 }
                             }
                         }
@@ -1942,15 +1904,15 @@ Item {
                                     anchors.fill: parent
                                     color: PlasmaCore.Theme.highlightColor
                                     radius: 4
-                                    opacity: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem)) ? 1.0 :
-                                    (mouseArea.containsMouse || fullRoot.isEmojiHovered(modelData.emoji, fullRoot.gridIsMouseOver) || fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver) ? 0.2 : 0)
+                                    opacity: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || (index === emojiGridView.keyboardPressedIndex)) ? 1.0 :
+                                    (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji, fullRoot.gridIsMouseOver) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
                                 }
 
                                 Rectangle {
                                     anchors.fill: parent
                                     color: "transparent"
                                     radius: 4
-                                    border.width: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || mouseArea.containsMouse || fullRoot.isEmojiHovered(modelData.emoji, fullRoot.gridIsMouseOver) || fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem)) ? 2 : 0
+                                    border.width: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji, fullRoot.gridIsMouseOver) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
                                     border.color: PlasmaCore.Theme.highlightColor
                                 }
                             }
@@ -1998,8 +1960,14 @@ Item {
                                         const isShift = mouse.modifiers & Qt.ShiftModifier
                                         handleEmojiSelected(modelData.emoji, isCtrl, isShift)
                                     } else if (mouse.button === Qt.RightButton) {
-                                        handleEmojiRightClicked(modelData.emoji, modelData, Qt.point(mouse.x, mouse.y))
+                                        var globalPos = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y)
+                                        handleEmojiRightClicked(modelData.emoji, modelData, globalPos)
                                     }
+                                }
+                                
+                                onPressAndHold: {
+                                    var globalPos = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y)
+                                    handleEmojiRightClicked(modelData.emoji, modelData, globalPos)
                                 }
                             }
                         }
@@ -2075,12 +2043,12 @@ Item {
     // Context Menus & Shortcuts
     // =========================================================================
 
-    PlasmaComponents.Menu {
+    PC3.Menu {
         id: contextMenu
         property string emoji: ""
         property var emojiObj: null
 
-        PlasmaComponents.MenuItem {
+        PC3.MenuItem {
             text: i18n("Copy Emoji")
             icon.name: "edit-copy"
             onClicked: {
@@ -2089,7 +2057,7 @@ Item {
             }
         }
 
-        PlasmaComponents.MenuItem {
+        PC3.MenuItem {
             text: i18n("Copy Name")
             icon.name: "edit-copy"
             enabled: contextMenu.emojiObj && contextMenu.emojiObj.name && contextMenu.emojiObj.name.length > 0
@@ -2104,7 +2072,7 @@ Item {
             }
         }
 
-        PlasmaComponents.MenuItem {
+        PC3.MenuItem {
             text: isFavorite(contextMenu.emoji) ? i18n("Unfavorite Emoji") : i18n("Favorite Emoji")
             icon.name: isFavorite(contextMenu.emoji) ? "bookmarks" : "bookmarks-bookmarked"
             onClicked: {
@@ -2120,9 +2088,9 @@ Item {
         }
     }
 
-    PlasmaComponents.Menu {
+    PC3.Menu {
         id: recentContextMenu
-        PlasmaComponents.MenuItem {
+        PC3.MenuItem {
             text: i18n("Clear Recent Emojis")
             icon.name: "edit-clear"
             onClicked: {
@@ -2132,9 +2100,9 @@ Item {
         }
     }
 
-    PlasmaComponents.Menu {
+    PC3.Menu {
         id: favoritesContextMenu
-        PlasmaComponents.MenuItem {
+        PC3.MenuItem {
             text: i18n("Clear Favorite Emojis")
             icon.name: "edit-clear"
             onClicked: {
