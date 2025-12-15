@@ -11,7 +11,7 @@
     <br />
   </p>
   
-  ![](screens/1.png)
+  ![](./PREVIEW.png)
 </div>
 
 ## Quick install
