@@ -30,6 +30,9 @@ Item {
     property bool sidebarExpanded: false
     property bool isAnyCategoryDragging: false
     property var selectedEmojis: []
+    // Parallel lookup object — O(1) membership test vs O(n) indexOf on the array.
+    // Must be kept in sync with selectedEmojis at every mutation site.
+    property var selectedEmojiSet: ({})
 
     // Search & Feedback
     property string hoveredEmojiName: ""
@@ -478,7 +481,8 @@ Item {
     }
 
     function isEmojiSelected(emoji) {
-        return fullRoot.selectedEmojis.indexOf(emoji) >= 0
+        // O(1) object lookup instead of O(n) array scan
+        return !!fullRoot.selectedEmojiSet[emoji]
     }
 
     function isEmojiKeyboardFocused(isCurrent, isActive) {
@@ -489,10 +493,10 @@ Item {
         return isCurrent && (fullRoot.gridKeyboardActionPressed || fullRoot.gridExternalKeyboardActionPressed)
     }
 
-    function isEmojiHovered(emoji) {
-        return fullRoot.emojiHoveredEmojiKey === emoji
-    }
-    
+    // isEmojiHovered removed: mouseArea.containsMouse in each delegate covers the
+    // same condition locally without causing all visible cells to re-evaluate
+    // their bindings whenever emojiHoveredEmojiKey changes at the root level.
+
     function isEmojiLastHovered(emoji, gridMouseOver) {
         return fullRoot.emojiLastHoveredEmojiKey === emoji && !gridMouseOver
     }
@@ -618,6 +622,11 @@ Item {
             }
             fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice()
 
+            // Rebuild the O(1) lookup set from the authoritative array
+            const newSet = {}
+            for (const e of fullRoot.selectedEmojis) newSet[e] = true
+            fullRoot.selectedEmojiSet = newSet
+
             if (fullRoot.selectedEmojis.length > 0) {
                 pasteField.placeholderText = i18n("Selected %1 emoji(s)", fullRoot.selectedEmojis.length)
             } else {
@@ -629,6 +638,7 @@ Item {
                 clipboard.content = combined
                 showCopiedFeedback(combined, fullRoot.selectedEmojis.length + " emojis")
                 fullRoot.selectedEmojis = []
+                fullRoot.selectedEmojiSet = ({})
             } else {
                 if (isShiftClick) {
                     if (emojiObj.name && emojiObj.name.length > 0) {
@@ -822,6 +832,7 @@ Item {
                         clipboard.content = combined
                         fullRoot.showCopiedFeedback(combined, fullRoot.selectedEmojis.length + " emojis")
                         fullRoot.selectedEmojis = []
+                        fullRoot.selectedEmojiSet = ({})
 
                         if (plasmoid.configuration.CloseAfterSelection) {
                             if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
@@ -929,6 +940,7 @@ Item {
                                     clipboard.content = combined
                                     fullRoot.showCopiedFeedback(combined, fullRoot.selectedEmojis.length + " emojis")
                                     fullRoot.selectedEmojis = []
+                        fullRoot.selectedEmojiSet = ({})
 
                                     if (plasmoid.configuration.CloseAfterSelection) {
                                         if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
@@ -1049,6 +1061,7 @@ Item {
                                         clipboard.content = combined
                                         fullRoot.showCopiedFeedback(combined, fullRoot.selectedEmojis.length + " emojis")
                                         fullRoot.selectedEmojis = []
+                        fullRoot.selectedEmojiSet = ({})
 
                                         if (plasmoid.configuration.CloseAfterSelection) {
                                             if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
@@ -1843,14 +1856,14 @@ Item {
                                     color: Kirigami.Theme.highlightColor
                                     radius: 4
                                     opacity: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || (index === fullRoot.keyboardPressedIndex)) ? 1.0 :
-                                    (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
+                                    (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
                                 }
 
                                 Rectangle {
                                     anchors.fill: parent
                                     color: "transparent"
                                     radius: 4
-                                    border.width: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
+                                    border.width: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
                                     border.color: Kirigami.Theme.highlightColor
                                 }
                             }
