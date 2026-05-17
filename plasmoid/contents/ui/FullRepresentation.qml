@@ -25,10 +25,6 @@ Item {
     // Layout
     implicitHeight: Math.max(Kirigami.Units.gridUnit * 24, minimumRequiredHeight)
 
-    // Colors
-    readonly property color highContrastSectionColor: PlasmaCore.Theme.backgroundColor
-    readonly property color lowContrastSectionColor: PlasmaCore.Theme.viewBackgroundColor
-
     // State
     property var plasmoidItem: null
     property bool sidebarExpanded: false
@@ -36,7 +32,6 @@ Item {
     property var selectedEmojis: []
 
     // Search & Feedback
-    property string hoveredEmoji: ""
     property string hoveredEmojiName: ""
     property int keyboardPressedIndex: -1
     property string defaultPastePlaceholder: i18n("Paste emojis…")
@@ -53,7 +48,6 @@ Item {
     }
 
     // EmojiView Integration Properties
-    property var emojiViewModel: []
     property alias emojiGridView: emojiGridView
     property var emojiExternalScrollBar: null
     property string emojiHoveredEmojiKey: ""
@@ -406,12 +400,9 @@ Item {
     }
 
     onFilteredEmojisChanged: {
-        fullRoot.emojiViewModel = fullRoot.filteredEmojis
-
-        if (fullRoot.filter && fullRoot.filter.length > 0 && fullRoot.emojiViewModel.length > 0) {
-            const firstItem = fullRoot.emojiViewModel[0]
+        if (fullRoot.filter && fullRoot.filter.length > 0 && fullRoot.filteredEmojis.length > 0) {
+            const firstItem = fullRoot.filteredEmojis[0]
             fullRoot.emojiHoveredEmojiKey = firstItem.emoji
-            fullRoot.hoveredEmoji = firstItem.emoji
             fullRoot.hoveredEmojiName = firstItem.name
             fullRoot.emojiLastHoveredEmojiKey = firstItem.emoji
 
@@ -426,22 +417,12 @@ Item {
     // =========================================================================
 
     function emojiModelLength() {
-        if (!fullRoot.emojiViewModel) return 0
-        if (fullRoot.emojiViewModel.length !== undefined) return fullRoot.emojiViewModel.length
-        if (fullRoot.emojiViewModel.count !== undefined) return fullRoot.emojiViewModel.count
-        return 0
+        return fullRoot.filteredEmojis ? fullRoot.filteredEmojis.length : 0
     }
 
     function emojiModelItemAt(index) {
-        if (!fullRoot.emojiViewModel || index < 0) return null
-        if (fullRoot.emojiViewModel.length !== undefined) {
-            if (index >= fullRoot.emojiViewModel.length) return null
-            return fullRoot.emojiViewModel[index]
-        }
-        if (typeof fullRoot.emojiViewModel.get === "function") {
-            return fullRoot.emojiViewModel.get(index)
-        }
-        return null
+        if (!fullRoot.filteredEmojis || index < 0 || index >= fullRoot.filteredEmojis.length) return null
+        return fullRoot.filteredEmojis[index]
     }
 
     function emojiIndexForEmojiKey(key) {
@@ -497,8 +478,7 @@ Item {
         return isCurrent && (fullRoot.gridKeyboardActionPressed || fullRoot.gridExternalKeyboardActionPressed)
     }
 
-    function isEmojiHovered(emoji, gridMouseOver) {
-        // Global hover check
+    function isEmojiHovered(emoji) {
         return fullRoot.emojiHoveredEmojiKey === emoji
     }
     
@@ -590,20 +570,20 @@ Item {
     }
 
     function getCurrentFocusedEmoji() {
-        if (emojiGridView.currentIndex >= 0 && emojiGridView.currentIndex < fullRoot.emojiViewModel.length) {
-            return fullRoot.emojiViewModel[emojiGridView.currentIndex]
+        if (emojiGridView.currentIndex >= 0 && emojiGridView.currentIndex < fullRoot.filteredEmojis.length) {
+            return fullRoot.filteredEmojis[emojiGridView.currentIndex]
         }
         if (fullRoot.emojiHoveredEmojiKey) {
-            for (let i = 0; i < fullRoot.emojiViewModel.length; i++) {
-                if (fullRoot.emojiViewModel[i].emoji === fullRoot.emojiHoveredEmojiKey) {
-                    return fullRoot.emojiViewModel[i]
+            for (let i = 0; i < fullRoot.filteredEmojis.length; i++) {
+                if (fullRoot.filteredEmojis[i].emoji === fullRoot.emojiHoveredEmojiKey) {
+                    return fullRoot.filteredEmojis[i]
                 }
             }
         }
         if (fullRoot.emojiLastHoveredEmojiKey) {
-            for (let i = 0; i < fullRoot.emojiViewModel.length; i++) {
-                if (fullRoot.emojiViewModel[i].emoji === fullRoot.emojiLastHoveredEmojiKey) {
-                    return fullRoot.emojiViewModel[i]
+            for (let i = 0; i < fullRoot.filteredEmojis.length; i++) {
+                if (fullRoot.filteredEmojis[i].emoji === fullRoot.emojiLastHoveredEmojiKey) {
+                    return fullRoot.filteredEmojis[i]
                 }
             }
         }
@@ -764,7 +744,6 @@ Item {
         Qt.callLater(loadEmojis)
 
         fullRoot.resetSearchPlaceholder()
-        fullRoot.emojiViewModel = fullRoot.filteredEmojis
         fullRoot.emojiExternalScrollBar = null
         fullRoot.emojiKeyboardNavigationEnabled = plasmoid.configuration.KeyboardNavigation
         Qt.callLater(function() {
@@ -949,16 +928,16 @@ Item {
 
                                 const isShift = (event.modifiers & Qt.ShiftModifier)
 
-                                if (fullRoot.hoveredEmoji) {
-                                    const hoveredEmojiObj = fullRoot.filteredEmojis.find(e => e.emoji === fullRoot.hoveredEmoji) || {
-                                        emoji: fullRoot.hoveredEmoji,
+                                if (fullRoot.emojiHoveredEmojiKey) {
+                                    const hoveredEmojiObj = fullRoot.filteredEmojis.find(e => e.emoji === fullRoot.emojiHoveredEmojiKey) || {
+                                        emoji: fullRoot.emojiHoveredEmojiKey,
                                         name: fullRoot.hoveredEmojiName,
                                         slug: "",
                                         group: ""
                                     }
 
                                     if (emojiGridView && typeof emojiGridView.triggerExternalFeedback === "function") {
-                                        var idx = fullRoot.emojiIndexForEmojiKey(fullRoot.hoveredEmoji)
+                                        var idx = fullRoot.emojiIndexForEmojiKey(fullRoot.emojiHoveredEmojiKey)
                                         if (idx >= 0) {
                                             emojiGridView.currentIndex = idx
                                             emojiGridView.triggerExternalFeedback()
@@ -970,9 +949,9 @@ Item {
                                         addRecentEmoji(hoveredEmojiObj)
                                         showCopiedFeedback(hoveredEmojiObj.name, hoveredEmojiObj.emoji)
                                     } else {
-                                        clipboard.content = fullRoot.hoveredEmoji
+                                        clipboard.content = fullRoot.emojiHoveredEmojiKey
                                         addRecentEmoji(hoveredEmojiObj)
-                                        showCopiedFeedback(fullRoot.hoveredEmoji, fullRoot.hoveredEmojiName)
+                                        showCopiedFeedback(fullRoot.emojiHoveredEmojiKey, fullRoot.hoveredEmojiName)
                                     }
                                     searchField.text = ""
                                 } else if (fullRoot.filteredEmojis.length > 0) {
@@ -1064,16 +1043,16 @@ Item {
                                             if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
                                         }
                                         event.accepted = true
-                                    } else if (fullRoot.hoveredEmoji) {
-                                        const hoveredEmojiObj = fullRoot.filteredEmojis.find(e => e.emoji === fullRoot.hoveredEmoji) || {
-                                            emoji: fullRoot.hoveredEmoji,
+                                    } else if (fullRoot.emojiHoveredEmojiKey) {
+                                        const hoveredEmojiObj = fullRoot.filteredEmojis.find(e => e.emoji === fullRoot.emojiHoveredEmojiKey) || {
+                                            emoji: fullRoot.emojiHoveredEmojiKey,
                                             name: fullRoot.hoveredEmojiName,
                                             slug: "",
                                             group: ""
                                         }
 
                                         if (emojiGridView && typeof emojiGridView.triggerExternalFeedback === "function") {
-                                            var idx = fullRoot.emojiIndexForEmojiKey(fullRoot.hoveredEmoji)
+                                            var idx = fullRoot.emojiIndexForEmojiKey(fullRoot.emojiHoveredEmojiKey)
                                             if (idx >= 0) {
                                                 emojiGridView.currentIndex = idx
                                                 emojiGridView.triggerExternalFeedback()
@@ -1085,9 +1064,9 @@ Item {
                                             addRecentEmoji(hoveredEmojiObj)
                                             showCopiedFeedback(hoveredEmojiObj.name, hoveredEmojiObj.emoji)
                                         } else {
-                                            clipboard.content = fullRoot.hoveredEmoji
+                                            clipboard.content = fullRoot.emojiHoveredEmojiKey
                                             addRecentEmoji(hoveredEmojiObj)
-                                            showCopiedFeedback(fullRoot.hoveredEmoji, fullRoot.hoveredEmojiName)
+                                            showCopiedFeedback(fullRoot.emojiHoveredEmojiKey, fullRoot.hoveredEmojiName)
                                         }
                                         event.accepted = true
                                     }
@@ -1670,7 +1649,7 @@ Item {
                         cellWidth: fullRoot.internalGridSize
                         cellHeight: fullRoot.internalGridSize
                         rightMargin: ScrollBar.vertical.visible ? ScrollBar.vertical.width : 0
-                        model: fullRoot.emojiViewModel
+                        model: fullRoot.filteredEmojis
                         clip: true
                         interactive: true
                         flickableDirection: Flickable.VerticalFlick
@@ -1687,7 +1666,7 @@ Item {
                                 if (!hovered && fullRoot.emojiHoveredEmojiKey !== "") {
                                     fullRoot.emojiLastHoveredEmojiKey = fullRoot.emojiHoveredEmojiKey
                                     fullRoot.emojiHoveredEmojiKey = ""
-                                    fullRoot.hoveredEmoji = ""
+                                    fullRoot.emojiHoveredEmojiKey = ""
                                     fullRoot.hoveredEmojiName = ""
                                 }
                             }
@@ -1703,12 +1682,12 @@ Item {
 
                         function updateKeyboardHover() {
                             if (!fullRoot.emojiKeyboardNavigationEnabled) return
-                                if (currentIndex >= 0 && currentIndex < fullRoot.emojiViewModel.length) {
-                                    const item = fullRoot.emojiViewModel[currentIndex]
+                                if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                    const item = fullRoot.filteredEmojis[currentIndex]
                                     if (item) {
                                         if (fullRoot.emojiHoveredEmojiKey !== item.emoji) {
                                             fullRoot.emojiHoveredEmojiKey = item.emoji
-                                            fullRoot.hoveredEmoji = item.emoji
+                                            fullRoot.emojiHoveredEmojiKey = item.emoji
                                             fullRoot.hoveredEmojiName = item.name
                                         }
                                         if (fullRoot.emojiLastHoveredEmojiKey !== item.emoji) {
@@ -1721,7 +1700,7 @@ Item {
                         function clearKeyboardHover() {
                             if (fullRoot.emojiHoveredEmojiKey !== "") {
                                 fullRoot.emojiHoveredEmojiKey = ""
-                                fullRoot.hoveredEmoji = ""
+                                fullRoot.emojiHoveredEmojiKey = ""
                                 fullRoot.hoveredEmojiName = ""
                             }
                         }
@@ -1735,10 +1714,10 @@ Item {
                                     fullRoot.gridKeyboardActionPressed = true
                                     event.accepted = true
                                 } else if (event.key === Qt.Key_Space) {
-                                    if (currentIndex >= 0 && currentIndex < fullRoot.emojiViewModel.length) {
-                                        const item = fullRoot.emojiViewModel[currentIndex]
+                                    if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                        const item = fullRoot.filteredEmojis[currentIndex]
                                         fullRoot.emojiHoveredEmojiKey = item.emoji
-                                        fullRoot.hoveredEmoji = item.emoji
+                                        fullRoot.emojiHoveredEmojiKey = item.emoji
                                         fullRoot.hoveredEmojiName = item.name
                                     }
                                     event.accepted = true
@@ -1765,8 +1744,8 @@ Item {
                                 fullRoot.gridKeyboardActionPressed = false
                                 fullRoot.keyboardPressedIndex = -1
                                 const isCtrl = event.modifiers & Qt.ControlModifier
-                                if (!isCtrl && currentIndex >= 0 && currentIndex < fullRoot.emojiViewModel.length) {
-                                    const item = fullRoot.emojiViewModel[currentIndex]
+                                if (!isCtrl && currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                    const item = fullRoot.filteredEmojis[currentIndex]
                                     const isShift = event.modifiers & Qt.ShiftModifier
                                     handleEmojiSelected(item.emoji, false, isShift)
                                 }
@@ -1779,8 +1758,8 @@ Item {
                                 if (count > 0) {
                                     if (currentIndex < 0 || currentIndex >= count) {
                                         if (fullRoot.emojiHoveredEmojiKey) {
-                                            for (var i = 0; i < fullRoot.emojiViewModel.length; i++) {
-                                                if (fullRoot.emojiViewModel[i].emoji === fullRoot.emojiHoveredEmojiKey) {
+                                            for (var i = 0; i < fullRoot.filteredEmojis.length; i++) {
+                                                if (fullRoot.filteredEmojis[i].emoji === fullRoot.emojiHoveredEmojiKey) {
                                                     currentIndex = i
                                                     break
                                                 }
@@ -1803,8 +1782,8 @@ Item {
                                 if (count > 0 && activeFocus) {
                                     if (currentIndex < 0 || currentIndex >= count) {
                                         if (fullRoot.emojiHoveredEmojiKey) {
-                                            for (var i = 0; i < fullRoot.emojiViewModel.length; i++) {
-                                                if (fullRoot.emojiViewModel[i].emoji === fullRoot.emojiHoveredEmojiKey) {
+                                            for (var i = 0; i < fullRoot.filteredEmojis.length; i++) {
+                                                if (fullRoot.filteredEmojis[i].emoji === fullRoot.emojiHoveredEmojiKey) {
                                                     currentIndex = i
                                                     break
                                                 }
@@ -1831,8 +1810,8 @@ Item {
                         onCurrentIndexChanged: {
                             if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
                                 updateKeyboardHover()
-                                if (currentIndex >= 0 && currentIndex < fullRoot.emojiViewModel.length) {
-                                    const item = fullRoot.emojiViewModel[currentIndex]
+                                if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                    const item = fullRoot.filteredEmojis[currentIndex]
                                     if (item) {
                                         fullRoot.emojiLastHoveredEmojiKey = item.emoji
                                     }
@@ -1853,14 +1832,14 @@ Item {
                                     color: Kirigami.Theme.highlightColor
                                     radius: 4
                                     opacity: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || (index === fullRoot.keyboardPressedIndex)) ? 1.0 :
-                                    (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji, fullRoot.gridIsMouseOver) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
+                                    (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
                                 }
 
                                 Rectangle {
                                     anchors.fill: parent
                                     color: "transparent"
                                     radius: 4
-                                    border.width: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji, fullRoot.gridIsMouseOver) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
+                                    border.width: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
                                     border.color: Kirigami.Theme.highlightColor
                                 }
                             }
@@ -1882,7 +1861,7 @@ Item {
 
                                 onEntered: {
                                     fullRoot.emojiHoveredEmojiKey = modelData.emoji
-                                    fullRoot.hoveredEmoji = modelData.emoji
+                                    fullRoot.emojiHoveredEmojiKey = modelData.emoji
                                     fullRoot.hoveredEmojiName = modelData.name
 
                                     if (emojiGridView && fullRoot.emojiKeyboardNavigationEnabled) {
@@ -1954,9 +1933,9 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: fullRoot.hoveredEmoji
+                        text: fullRoot.emojiHoveredEmojiKey
                         font.pixelSize: previewBar.height - 20
-                        visible: fullRoot.hoveredEmoji !== ""
+                        visible: fullRoot.emojiHoveredEmojiKey !== ""
                         color: Kirigami.Theme.textColor
                     }
 
@@ -1966,19 +1945,19 @@ Item {
                         width: parent.height
                         height: parent.height
                         color: Kirigami.Theme.disabledTextColor
-                        visible: fullRoot.hoveredEmoji === ""
+                        visible: fullRoot.emojiHoveredEmojiKey === ""
                     }
                 }
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignVCenter
-                    text: fullRoot.hoveredEmoji !== "" ? fullRoot.hoveredEmojiName : i18n("Hover over an emoji for details...")
+                    text: fullRoot.emojiHoveredEmojiKey !== "" ? fullRoot.hoveredEmojiName : i18n("Hover over an emoji for details...")
                     font.pixelSize: 14
                     font.bold: false
                     elide: Text.ElideRight
-                    color: fullRoot.hoveredEmoji !== "" ? Kirigami.Theme.textColor : Kirigami.Theme.disabledTextColor
-                    visible: fullRoot.hoveredEmoji === "" || fullRoot.hoveredEmojiName !== ""
+                    color: fullRoot.emojiHoveredEmojiKey !== "" ? Kirigami.Theme.textColor : Kirigami.Theme.disabledTextColor
+                    visible: fullRoot.emojiHoveredEmojiKey === "" || fullRoot.hoveredEmojiName !== ""
                 }
             }
         }
