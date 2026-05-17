@@ -42,10 +42,12 @@ Usage: $0 [OPTIONS]
 Options:
     -h, --help          Show this help message
     -x, --verbose       Enable verbose output for debugging
+    --reload            Restart plasmashell after install to apply changes
     --uninstall         Uninstall kMoji
 
 Examples:
     $0                  # Standard installation
+    $0 --reload         # Install and immediately restart plasmashell
     $0 --uninstall      # Remove kMoji
 
 EOF
@@ -54,6 +56,7 @@ EOF
 # Parse arguments
 DEBUG=false
 UNINSTALL=false
+RELOAD=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -65,6 +68,10 @@ while [[ $# -gt 0 ]]; do
             DEBUG=true
             shift
             ;; 
+        --reload)
+            RELOAD=true
+            shift
+            ;;
         --uninstall)
             UNINSTALL=true
             shift
@@ -138,3 +145,13 @@ echo "1. Right-click on your Plasma panel"
 echo "2. Select 'Add Widgets'"
 echo "3. Search for 'kMoji'"
 echo "4. Drag the widget to your panel"
+
+# Optional plasmashell reload
+if [[ "${RELOAD}" == "true" ]]; then
+    echo
+    log_step "Restarting plasmashell..."
+    # Detach from terminal so closing the shell won't kill the new instance.
+    # --replace tells the new process to take over the currently running one.
+    nohup plasmashell --replace > /dev/null 2>&1 & disown
+    log_info "✓ plasmashell restarting in background"
+fi
