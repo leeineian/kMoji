@@ -307,6 +307,11 @@ Item {
         favoriteEmojis = favoriteEmojis.slice()
         saveFavoriteEmojis()
         updateFilteredEmojis()
+
+        const displayName = (emoji && emoji.name && emoji.name.length > 0) ? emoji.name : ""
+        const label = displayName && displayName.length > 0 ? displayName + " (" + emoji.emoji + ")" : emoji.emoji
+        showSearchTemporaryMessage(isFavoriteNow ? i18n("Favorited: %1", label) : i18n("Unfavorited: %1", label))
+
         return isFavoriteNow
     }
 
@@ -612,12 +617,7 @@ Item {
         }
 
         if (isAltClick) {
-            const isFav = fullRoot.toggleFavoriteEmoji(emojiObj)
-            if (isFav) {
-                showPasteTemporaryMessage(i18n("Added to favorites: %1", emojiObj.name || emojiObj.emoji))
-            } else {
-                showPasteTemporaryMessage(i18n("Removed from favorites: %1", emojiObj.name || emojiObj.emoji))
-            }
+            fullRoot.toggleFavoriteEmoji(emojiObj)
             return
         }
 
@@ -2021,14 +2021,7 @@ Item {
             text: isFavorite(contextMenu.emoji) ? i18n("Unfavorite Emoji") : i18n("Favorite Emoji")
             icon.name: isFavorite(contextMenu.emoji) ? "bookmarks" : "bookmarks-bookmarked"
             onClicked: {
-                var isFavoriteNow = toggleFavoriteEmoji(contextMenu.emojiObj)
-                var displayName = (contextMenu.emojiObj && contextMenu.emojiObj.name && contextMenu.emojiObj.name.length > 0) ? contextMenu.emojiObj.name : ""
-                var label = displayName && displayName.length > 0 ? displayName + " (" + contextMenu.emoji + ")" : contextMenu.emoji
-                if (isFavoriteNow) {
-                    showSearchTemporaryMessage(i18n("Favorited: %1", label))
-                } else {
-                    showSearchTemporaryMessage(i18n("Unfavorited: %1", label))
-                }
+                toggleFavoriteEmoji(contextMenu.emojiObj)
             }
         }
     }
