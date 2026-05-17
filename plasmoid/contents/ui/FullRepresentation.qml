@@ -1554,7 +1554,7 @@ Item {
                                     source: model.icon
                                     width: Kirigami.Units.iconSizes.smallMedium + 2
                                     height: Kirigami.Units.iconSizes.smallMedium + 2
-                                    color: fullRoot.isCategorySelected(model.name) ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                                    color: fullRoot.isCategorySelected(model.name) ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
                                     visible: !fullRoot.sidebarExpanded
                                 }
 
@@ -1569,13 +1569,13 @@ Item {
                                         source: model.icon
                                         width: Kirigami.Units.iconSizes.smallMedium + 2
                                         height: Kirigami.Units.iconSizes.smallMedium + 2
-                                        color: fullRoot.isCategorySelected(model.name) ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                                        color: fullRoot.isCategorySelected(model.name) ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
                                         anchors.verticalCenter: parent.verticalCenter
                                     }
 
                                     Text {
                                         text: model.displayName
-                                        color: fullRoot.isCategorySelected(model.name) ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                                        color: fullRoot.isCategorySelected(model.name) ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
                                         font.bold: false
                                         anchors.verticalCenter: parent.verticalCenter
                                         elide: Text.ElideRight
