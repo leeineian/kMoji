@@ -1742,7 +1742,6 @@ Item {
                             hoverEnabled: true
                             propagateComposedEvents: true
                             onEntered: emojiGridView.setMouseOver()
-                            onExited: emojiGridView.setMouseExit()
                         }
 
                         Keys.onPressed: function(event) {
