@@ -1121,6 +1121,8 @@ Item {
                 Layout.fillHeight: true
                 Layout.preferredWidth: fullRoot.sidebarExpanded ? 180 : 32
                 Layout.maximumWidth: 180
+                Kirigami.Theme.colorSet: Kirigami.Theme.Window
+                Kirigami.Theme.inherit: false
 
                 Item {
                     anchors.fill: parent
@@ -1195,7 +1197,7 @@ Item {
                             anchors.margins: 4
                             Rectangle {
                                 anchors.fill: parent
-                                color: PlasmaCore.Theme.highlightColor
+                                color: Kirigami.Theme.highlightColor
                                 radius: 4
                                 opacity: (pinArea.pressed || fullRoot.pinButtonKeyboardPressed) ? 1.0 : (((pinArea.containsMouse) || pinButton.activeFocus) ? 0.2 : 0)
                             }
@@ -1204,7 +1206,7 @@ Item {
                                 color: "transparent"
                                 radius: 4
                                 border.width: ((pinArea.containsMouse) || pinButton.activeFocus) ? 2 : 0
-                                border.color: PlasmaCore.Theme.highlightColor
+                                border.color: Kirigami.Theme.highlightColor
                             }
                         }
 
@@ -1215,7 +1217,7 @@ Item {
                                 source: plasmoid.configuration.AlwaysOpen ? "window-unpin-symbolic" : "window-pin-symbolic"
                                 width: Kirigami.Units.iconSizes.smallMedium + 2
                                 height: Kirigami.Units.iconSizes.smallMedium + 2
-                                color: PlasmaCore.Theme.textColor
+                                color: Kirigami.Theme.textColor
                                 visible: !fullRoot.sidebarExpanded
                             }
 
@@ -1230,13 +1232,13 @@ Item {
                                     source: plasmoid.configuration.AlwaysOpen ? "window-unpin-symbolic" : "window-pin-symbolic"
                                     width: Kirigami.Units.iconSizes.smallMedium + 2
                                     height: Kirigami.Units.iconSizes.smallMedium + 2
-                                    color: PlasmaCore.Theme.textColor
+                                    color: Kirigami.Theme.textColor
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
                                 Text {
                                     text: plasmoid.configuration.AlwaysOpen ? i18n("Unpin Popup") : i18n("Pin Popup")
-                                    color: PlasmaCore.Theme.textColor
+                                    color: Kirigami.Theme.textColor
                                     font.bold: false
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
@@ -1318,7 +1320,7 @@ Item {
                             anchors.margins: 4
                             Rectangle {
                                 anchors.fill: parent
-                                color: PlasmaCore.Theme.highlightColor
+                                color: Kirigami.Theme.highlightColor
                                 radius: 4
                                 opacity: (settingsArea.pressed || fullRoot.settingsButtonKeyboardPressed) ? 1.0 : (((settingsArea.containsMouse) || settingsButtonInSidebar.activeFocus) ? 0.2 : 0)
                             }
@@ -1327,7 +1329,7 @@ Item {
                                 color: "transparent"
                                 radius: 4
                                 border.width: ((settingsArea.containsMouse) || settingsButtonInSidebar.activeFocus) ? 2 : 0
-                                border.color: PlasmaCore.Theme.highlightColor
+                                border.color: Kirigami.Theme.highlightColor
                             }
                         }
 
@@ -1338,7 +1340,7 @@ Item {
                                 source: "configure"
                                 width: Kirigami.Units.iconSizes.smallMedium + 2
                                 height: Kirigami.Units.iconSizes.smallMedium + 2
-                                color: PlasmaCore.Theme.textColor
+                                color: Kirigami.Theme.textColor
                                 visible: !fullRoot.sidebarExpanded
                             }
 
@@ -1353,13 +1355,13 @@ Item {
                                     source: "configure"
                                     width: Kirigami.Units.iconSizes.smallMedium + 2
                                     height: Kirigami.Units.iconSizes.smallMedium + 2
-                                    color: PlasmaCore.Theme.textColor
+                                    color: Kirigami.Theme.textColor
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
                                 Text {
                                     text: i18n("Configure Settings")
-                                    color: PlasmaCore.Theme.textColor
+                                    color: Kirigami.Theme.textColor
                                     font.bold: false
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
@@ -1432,7 +1434,7 @@ Item {
                             anchors.margins: 4
                             Rectangle {
                                 anchors.fill: parent
-                                color: PlasmaCore.Theme.highlightColor
+                                color: Kirigami.Theme.highlightColor
                                 radius: 4
                                 opacity: (sidebarToggleArea.pressed || fullRoot.sidebarButtonKeyboardPressed) ? 1.0 : (((sidebarToggleArea.containsMouse) || sidebarToggleButton.activeFocus) ? 0.2 : 0)
                             }
@@ -1441,7 +1443,7 @@ Item {
                                 color: "transparent"
                                 radius: 4
                                 border.width: ((sidebarToggleArea.containsMouse) || sidebarToggleButton.activeFocus) ? 2 : 0
-                                border.color: PlasmaCore.Theme.highlightColor
+                                border.color: Kirigami.Theme.highlightColor
                             }
                         }
 
@@ -1452,7 +1454,7 @@ Item {
                                 source: "sidebar-expand"
                                 width: Kirigami.Units.iconSizes.smallMedium + 2
                                 height: Kirigami.Units.iconSizes.smallMedium + 2
-                                color: PlasmaCore.Theme.textColor
+                                color: Kirigami.Theme.textColor
                                 visible: !fullRoot.sidebarExpanded
                             }
 
@@ -1467,13 +1469,13 @@ Item {
                                     source: "sidebar-collapse"
                                     width: Kirigami.Units.iconSizes.smallMedium + 2
                                     height: Kirigami.Units.iconSizes.smallMedium + 2
-                                    color: PlasmaCore.Theme.textColor
+                                    color: Kirigami.Theme.textColor
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
                                 Text {
                                     text: i18n("Close Sidebar")
-                                    color: PlasmaCore.Theme.textColor
+                                    color: Kirigami.Theme.textColor
                                     font.bold: false
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
@@ -1529,7 +1531,7 @@ Item {
                                 anchors.margins: 4
                                 Rectangle {
                                     anchors.fill: parent
-                                    color: PlasmaCore.Theme.highlightColor
+                                    color: Kirigami.Theme.highlightColor
                                     radius: 4
                                     opacity: (fullRoot.isCategorySelected(model.name) || fullRoot.isCategoryDragging(index) || dragArea.pressed) ? 1.0 :
                                     (((dragArea.containsMouse && !fullRoot.isCategorySelected(model.name) && !fullRoot.isAnyCategoryDragging) || categoryButton.activeFocus) ? 0.2 : 0)
@@ -1541,7 +1543,7 @@ Item {
                                     border.width: ((fullRoot.isCategorySelected(model.name) || dragArea.pressed || fullRoot.isCategoryDragging(index)) ||
                                     (dragArea.containsMouse && !fullRoot.isCategorySelected(model.name) && !fullRoot.isAnyCategoryDragging) ||
                                     categoryButton.activeFocus) ? 2 : 0
-                                    border.color: PlasmaCore.Theme.highlightColor
+                                    border.color: Kirigami.Theme.highlightColor
                                 }
                             }
 
@@ -1552,7 +1554,7 @@ Item {
                                     source: model.icon
                                     width: Kirigami.Units.iconSizes.smallMedium + 2
                                     height: Kirigami.Units.iconSizes.smallMedium + 2
-                                    color: fullRoot.isCategorySelected(model.name) ? PlasmaCore.Theme.highlightedTextColor : PlasmaCore.Theme.textColor
+                                    color: fullRoot.isCategorySelected(model.name) ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
                                     visible: !fullRoot.sidebarExpanded
                                 }
 
@@ -1567,13 +1569,13 @@ Item {
                                         source: model.icon
                                         width: Kirigami.Units.iconSizes.smallMedium + 2
                                         height: Kirigami.Units.iconSizes.smallMedium + 2
-                                        color: fullRoot.isCategorySelected(model.name) ? PlasmaCore.Theme.highlightedTextColor : PlasmaCore.Theme.textColor
+                                        color: fullRoot.isCategorySelected(model.name) ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
                                         anchors.verticalCenter: parent.verticalCenter
                                     }
 
                                     Text {
                                         text: model.displayName
-                                        color: fullRoot.isCategorySelected(model.name) ? PlasmaCore.Theme.highlightedTextColor : PlasmaCore.Theme.textColor
+                                        color: fullRoot.isCategorySelected(model.name) ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
                                         font.bold: false
                                         anchors.verticalCenter: parent.verticalCenter
                                         elide: Text.ElideRight
@@ -1655,7 +1657,8 @@ Item {
                 id: emojiArea
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-
+                Kirigami.Theme.colorSet: Kirigami.Theme.Window
+                Kirigami.Theme.inherit: false
                 RowLayout {
                     anchors.fill: parent
                     spacing: 0
@@ -1865,7 +1868,7 @@ Item {
 
                                 Rectangle {
                                     anchors.fill: parent
-                                    color: PlasmaCore.Theme.highlightColor
+                                    color: Kirigami.Theme.highlightColor
                                     radius: 4
                                     opacity: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || (index === fullRoot.keyboardPressedIndex)) ? 1.0 :
                                     (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji, fullRoot.gridIsMouseOver) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
@@ -1876,7 +1879,7 @@ Item {
                                     color: "transparent"
                                     radius: 4
                                     border.width: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiHovered(modelData.emoji, fullRoot.gridIsMouseOver) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
-                                    border.color: PlasmaCore.Theme.highlightColor
+                                    border.color: Kirigami.Theme.highlightColor
                                 }
                             }
 
@@ -1941,7 +1944,7 @@ Item {
                     anchors.centerIn: parent
                     text: i18n("No results found :(")
                     font.pixelSize: 16
-                    color: PlasmaCore.Theme.textColor
+                    color: Kirigami.Theme.textColor
                     opacity: 0.6
                     visible: fullRoot.filteredEmojis.length === 0
                 }
