@@ -1680,27 +1680,17 @@ Item {
                         keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
                         keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
 
-                        Timer {
-                            id: mouseOverExitTimer
-                            interval: 100
-                            onTriggered: {
-                                fullRoot.gridIsMouseOver = false
-                                if (fullRoot.emojiHoveredEmojiKey !== "") {
+                        HoverHandler {
+                            id: gridHoverHandler
+                            onHoveredChanged: {
+                                fullRoot.gridIsMouseOver = hovered
+                                if (!hovered && fullRoot.emojiHoveredEmojiKey !== "") {
                                     fullRoot.emojiLastHoveredEmojiKey = fullRoot.emojiHoveredEmojiKey
                                     fullRoot.emojiHoveredEmojiKey = ""
                                     fullRoot.hoveredEmoji = ""
                                     fullRoot.hoveredEmojiName = ""
                                 }
                             }
-                        }
-
-                        function setMouseOver() {
-                            mouseOverExitTimer.stop()
-                            fullRoot.gridIsMouseOver = true
-                        }
-
-                        function setMouseExit() {
-                            mouseOverExitTimer.restart()
                         }
 
                         function triggerExternalFeedback() {
@@ -1736,13 +1726,6 @@ Item {
                             }
                         }
 
-                        MouseArea {
-                            anchors.fill: parent
-                            z: -1
-                            hoverEnabled: true
-                            propagateComposedEvents: true
-                            onEntered: emojiGridView.setMouseOver()
-                        }
 
                         Keys.onPressed: function(event) {
                             if (!fullRoot.emojiKeyboardNavigationEnabled) return
@@ -1905,17 +1888,11 @@ Item {
                                     if (emojiGridView && fullRoot.emojiKeyboardNavigationEnabled) {
                                         emojiGridView.currentIndex = index
                                     }
-                                    if (emojiGridView) {
-                                        emojiGridView.setMouseOver()
-                                    }
                                 }
 
                                 onExited: {
                                     if (fullRoot.emojiHoveredEmojiKey === modelData.emoji) {
                                         fullRoot.emojiLastHoveredEmojiKey = modelData.emoji
-                                    }
-                                    if (emojiGridView) {
-                                        emojiGridView.setMouseExit()
                                     }
                                 }
 
