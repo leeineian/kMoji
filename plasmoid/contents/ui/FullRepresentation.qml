@@ -1764,13 +1764,13 @@ Item {
                                 (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select)) {
                                 fullRoot.gridKeyboardActionPressed = false
                                 fullRoot.keyboardPressedIndex = -1
-                                if (currentIndex >= 0 && currentIndex < fullRoot.emojiViewModel.length) {
+                                const isCtrl = event.modifiers & Qt.ControlModifier
+                                if (!isCtrl && currentIndex >= 0 && currentIndex < fullRoot.emojiViewModel.length) {
                                     const item = fullRoot.emojiViewModel[currentIndex]
-                                    const isCtrl = event.modifiers & Qt.ControlModifier
                                     const isShift = event.modifiers & Qt.ShiftModifier
-                                    handleEmojiSelected(item.emoji, isCtrl, isShift)
-                                    event.accepted = true
+                                    handleEmojiSelected(item.emoji, false, isShift)
                                 }
+                                event.accepted = true
                             }
                         }
 
