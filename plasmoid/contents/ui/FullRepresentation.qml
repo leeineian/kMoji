@@ -1720,9 +1720,76 @@ Item {
                                     fullRoot.emojiHoveredEmojiKey = ""
                                     fullRoot.hoveredEmojiName = ""
                                 }
-                                if (!hovered) {
-                                    fullRoot.ctrlDragSelectActive = false
+                                // Do NOT cancel ctrlDragSelectActive here — cursor may re-enter the grid
+                                // while still holding Ctrl+mouse button
+                            }
+                        }
+
+                        // Single overlay for reliable Ctrl+drag lasso — position-based, never misses cells
+                        MouseArea {
+                            id: lassoOverlay
+                            anchors.fill: parent
+                            hoverEnabled: false
+                            acceptedButtons: Qt.LeftButton
+                            propagateComposedEvents: true
+                            enabled: fullRoot.ctrlDragSelectActive
+
+                            property real lastLassoX: -1
+                            property real lastLassoY: -1
+
+                            function selectAtPos(mx, my) {
+                                const idx = emojiGridView.indexAt(mx, my + emojiGridView.contentY)
+                                if (idx < 0 || idx >= fullRoot.filteredEmojis.length) return
+                                const item = fullRoot.filteredEmojis[idx]
+                                if (!item || fullRoot.isEmojiSelected(item.emoji)) return
+                                fullRoot.selectedEmojis.push(item.emoji)
+                                fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice()
+                                const newSet = {}
+                                for (const e of fullRoot.selectedEmojis) newSet[e] = true
+                                fullRoot.selectedEmojiSet = newSet
+                                pasteField.placeholderText = i18n("Selected %1 emoji(s)", fullRoot.selectedEmojis.length)
+                                fullRoot.emojiHoveredEmojiKey = item.emoji
+                                fullRoot.hoveredEmojiName = item.name
+                            }
+
+                            function selectAlongPath(x1, y1, x2, y2) {
+                                const step = Math.max(4, fullRoot.internalGridSize * 0.4)
+                                const dx = x2 - x1
+                                const dy = y2 - y1
+                                const dist = Math.sqrt(dx * dx + dy * dy)
+                                const steps = Math.ceil(dist / step)
+                                for (let i = 0; i <= steps; i++) {
+                                    const t = steps === 0 ? 1 : i / steps
+                                    selectAtPos(x1 + dx * t, y1 + dy * t)
                                 }
+                            }
+
+                            onPressed: {
+                                lastLassoX = mouse.x
+                                lastLassoY = mouse.y
+                                selectAtPos(mouse.x, mouse.y)
+                                mouse.accepted = false
+                            }
+
+                            onPositionChanged: {
+                                if (fullRoot.ctrlDragSelectActive) {
+                                    // Safety: if button was released outside the grid, cancel lasso
+                                    if (!(mouse.buttons & Qt.LeftButton)) {
+                                        fullRoot.ctrlDragSelectActive = false
+                                        lastLassoX = -1
+                                        lastLassoY = -1
+                                        return
+                                    }
+                                    selectAlongPath(lastLassoX, lastLassoY, mouse.x, mouse.y)
+                                    lastLassoX = mouse.x
+                                    lastLassoY = mouse.y
+                                }
+                            }
+
+                            onReleased: {
+                                fullRoot.ctrlDragSelectActive = false
+                                lastLassoX = -1
+                                lastLassoY = -1
                             }
                         }
 
@@ -1955,16 +2022,6 @@ Item {
                                     if (emojiGridView && fullRoot.emojiKeyboardNavigationEnabled) {
                                         emojiGridView.currentIndex = index
                                     }
-
-                                    // Ctrl+drag lasso: auto-select emoji when dragging with Ctrl held
-                                    if (fullRoot.ctrlDragSelectActive && !fullRoot.isEmojiSelected(modelData.emoji)) {
-                                        fullRoot.selectedEmojis.push(modelData.emoji)
-                                        fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice()
-                                        const newSet = {}
-                                        for (const e of fullRoot.selectedEmojis) newSet[e] = true
-                                        fullRoot.selectedEmojiSet = newSet
-                                        pasteField.placeholderText = i18n("Selected %1 emoji(s)", fullRoot.selectedEmojis.length)
-                                    }
                                 }
 
                                 onExited: {
@@ -1975,16 +2032,12 @@ Item {
 
                                 onPressed: {
                                     if (mouse.button === Qt.LeftButton && (mouse.modifiers & Qt.ControlModifier)) {
+                                        const gx = mouse.x + mouseArea.x
+                                        const gy = mouse.y + mouseArea.y
                                         fullRoot.ctrlDragSelectActive = true
-                                        // Immediately select the first emoji under the cursor
-                                        if (!fullRoot.isEmojiSelected(modelData.emoji)) {
-                                            fullRoot.selectedEmojis.push(modelData.emoji)
-                                            fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice()
-                                            const newSet = {}
-                                            for (const e of fullRoot.selectedEmojis) newSet[e] = true
-                                            fullRoot.selectedEmojiSet = newSet
-                                            pasteField.placeholderText = i18n("Selected %1 emoji(s)", fullRoot.selectedEmojis.length)
-                                        }
+                                        lassoOverlay.lastLassoX = gx
+                                        lassoOverlay.lastLassoY = gy
+                                        lassoOverlay.selectAtPos(gx, gy)
                                     }
                                 }
 
