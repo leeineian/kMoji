@@ -603,12 +603,22 @@ Item {
         return null
     }
 
-    function handleEmojiSelected(emoji, isCtrlClick, isShiftClick) {
+    function handleEmojiSelected(emoji, isCtrlClick, isShiftClick, isAltClick) {
         const emojiObj = fullRoot.emojiList.find(e => e.emoji === emoji) || {
             emoji: emoji,
             name: "",
             slug: "",
             group: ""
+        }
+
+        if (isAltClick) {
+            const isFav = fullRoot.toggleFavoriteEmoji(emojiObj)
+            if (isFav) {
+                showPasteTemporaryMessage(i18n("Added to favorites: %1", emojiObj.name || emojiObj.emoji))
+            } else {
+                showPasteTemporaryMessage(i18n("Removed from favorites: %1", emojiObj.name || emojiObj.emoji))
+            }
+            return
         }
 
         if (isCtrlClick) {
@@ -1754,9 +1764,10 @@ Item {
                                 fullRoot.keyboardPressedIndex = -1
                                 const isCtrl = event.modifiers & Qt.ControlModifier
                                 if (!isCtrl && currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                    const item = fullRoot.filteredEmojis[currentIndex]
+                                const item = fullRoot.filteredEmojis[currentIndex]
                                     const isShift = event.modifiers & Qt.ShiftModifier
-                                    handleEmojiSelected(item.emoji, false, isShift)
+                                    const isAlt = event.modifiers & Qt.AltModifier
+                                    handleEmojiSelected(item.emoji, false, isShift, isAlt)
                                 }
                                 event.accepted = true
                             }
@@ -1888,7 +1899,8 @@ Item {
                                     if (mouse.button === Qt.LeftButton) {
                                         const isCtrl = mouse.modifiers & Qt.ControlModifier
                                         const isShift = mouse.modifiers & Qt.ShiftModifier
-                                        handleEmojiSelected(modelData.emoji, isCtrl, isShift)
+                                        const isAlt = mouse.modifiers & Qt.AltModifier
+                                        handleEmojiSelected(modelData.emoji, isCtrl, isShift, isAlt)
                                     } else if (mouse.button === Qt.RightButton) {
                                         var globalPos = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y)
                                         handleEmojiRightClicked(modelData.emoji, modelData, globalPos)
