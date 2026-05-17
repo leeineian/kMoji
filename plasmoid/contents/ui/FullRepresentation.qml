@@ -429,6 +429,34 @@ Item {
         }
     }
 
+    Connections {
+        target: fullRoot.plasmoidItem
+        function onExpandedChanged() {
+            if (fullRoot.plasmoidItem && fullRoot.plasmoidItem.expanded) {
+                Qt.callLater(() => {
+                    if (searchField) {
+                        searchField.forceActiveFocus()
+                        searchField.selectAll()
+                    }
+                })
+            }
+        }
+    }
+
+    function handleEscapePressed() {
+        if (searchField.text.length > 0 || fullRoot.selectedEmojis.length > 0) {
+            searchField.text = ""
+            fullRoot.selectedEmojis = []
+            fullRoot.selectedEmojiSet = ({})
+            if (pasteField) pasteField.placeholderText = fullRoot.defaultPastePlaceholder
+            if (searchField) searchField.forceActiveFocus()
+        } else {
+            if (fullRoot.plasmoidItem) {
+                fullRoot.plasmoidItem.expanded = false
+            }
+        }
+    }
+
     // =========================================================================
     // Helper Functions (Navigation & Actions)
     // =========================================================================
@@ -1016,9 +1044,12 @@ Item {
 
                         Keys.onPressed: function(event) {
                                 if (plasmoid.configuration.KeyboardNavigation && event.key === Qt.Key_Escape) {
-                                    if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
-                                        event.accepted = true
+                                    handleEscapePressed()
+                                    event.accepted = true
                                 } else if (!plasmoid.configuration.KeyboardNavigation && (event.key === Qt.Key_Escape || event.key === Qt.Key_Tab || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+                                    if (event.key === Qt.Key_Escape) {
+                                        handleEscapePressed()
+                                    }
                                     event.accepted = true
                                     return
                                 }
@@ -1370,7 +1401,7 @@ Item {
                             }
                         }
                         PlasmaComponents.ToolTip {
-                            text: fullRoot.sidebarExpanded ? "" : i18n("Configure Emoji Selector Plus Settings...")
+                            text: fullRoot.sidebarExpanded ? "" : i18n("Configure Settings...")
                         }
                     }
 
@@ -1741,9 +1772,7 @@ Item {
                                     }
                                     event.accepted = true
                                 } else if (event.key === Qt.Key_Escape) {
-                                    if (fullRoot.plasmoidItem) {
-                                        fullRoot.plasmoidItem.expanded = false
-                                    }
+                                    handleEscapePressed()
                                     event.accepted = true
                                 } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
                                     const backwards = (event.key === Qt.Key_Backtab) || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))
