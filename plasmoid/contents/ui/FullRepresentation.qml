@@ -2032,12 +2032,12 @@ Item {
 
                                 onPressed: {
                                     if (mouse.button === Qt.LeftButton && (mouse.modifiers & Qt.ControlModifier)) {
-                                        const gx = mouse.x + mouseArea.x
-                                        const gy = mouse.y + mouseArea.y
+                                        // Map from cell-local coords to GridView coords for the lasso overlay
+                                        const mapped = mouseArea.mapToItem(emojiGridView, mouse.x, mouse.y)
                                         fullRoot.ctrlDragSelectActive = true
-                                        lassoOverlay.lastLassoX = gx
-                                        lassoOverlay.lastLassoY = gy
-                                        lassoOverlay.selectAtPos(gx, gy)
+                                        lassoOverlay.lastLassoX = mapped.x
+                                        lassoOverlay.lastLassoY = mapped.y
+                                        // Don't call selectAtPos here — onClicked handles the initial Ctrl+click selection
                                     }
                                 }
 
