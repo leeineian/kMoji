@@ -1122,12 +1122,6 @@ Item {
                 Layout.preferredWidth: fullRoot.sidebarExpanded ? 180 : 32
                 Layout.maximumWidth: 180
 
-                Rectangle {
-                    anchors.fill: parent
-                    color: PlasmaCore.Theme.backgroundColor
-                    opacity: 1.0
-                }
-
                 Item {
                     anchors.fill: parent
 
@@ -1199,12 +1193,6 @@ Item {
                         background: Item {
                             anchors.fill: parent
                             anchors.margins: 4
-                            Rectangle {
-                                anchors.fill: parent
-                                color: PlasmaCore.Theme.backgroundColor
-                                radius: 4
-                                opacity: 0.05
-                            }
                             Rectangle {
                                 anchors.fill: parent
                                 color: PlasmaCore.Theme.highlightColor
@@ -1330,12 +1318,6 @@ Item {
                             anchors.margins: 4
                             Rectangle {
                                 anchors.fill: parent
-                                color: PlasmaCore.Theme.backgroundColor
-                                radius: 4
-                                opacity: 0.05
-                            }
-                            Rectangle {
-                                anchors.fill: parent
                                 color: PlasmaCore.Theme.highlightColor
                                 radius: 4
                                 opacity: (settingsArea.pressed || fullRoot.settingsButtonKeyboardPressed) ? 1.0 : (((settingsArea.containsMouse) || settingsButtonInSidebar.activeFocus) ? 0.2 : 0)
@@ -1450,12 +1432,6 @@ Item {
                             anchors.margins: 4
                             Rectangle {
                                 anchors.fill: parent
-                                color: PlasmaCore.Theme.backgroundColor
-                                radius: 4
-                                opacity: 0.05
-                            }
-                            Rectangle {
-                                anchors.fill: parent
                                 color: PlasmaCore.Theme.highlightColor
                                 radius: 4
                                 opacity: (sidebarToggleArea.pressed || fullRoot.sidebarButtonKeyboardPressed) ? 1.0 : (((sidebarToggleArea.containsMouse) || sidebarToggleButton.activeFocus) ? 0.2 : 0)
@@ -1551,12 +1527,6 @@ Item {
                             background: Item {
                                 anchors.fill: parent
                                 anchors.margins: 4
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: PlasmaCore.Theme.backgroundColor
-                                    radius: 4
-                                    opacity: 0.05
-                                }
                                 Rectangle {
                                     anchors.fill: parent
                                     color: PlasmaCore.Theme.highlightColor
@@ -1685,12 +1655,6 @@ Item {
                 id: emojiArea
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-
-                Rectangle {
-                    anchors.fill: parent
-                    color: PlasmaCore.Theme.backgroundColor
-                    opacity: 1.0
-                }
 
                 RowLayout {
                     anchors.fill: parent
@@ -1898,13 +1862,6 @@ Item {
                             Item {
                                 anchors.fill: parent
                                 anchors.margins: 2
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: PlasmaCore.Theme.backgroundColor
-                                    radius: 4
-                                    opacity: 0.05
-                                }
 
                                 Rectangle {
                                     anchors.fill: parent
