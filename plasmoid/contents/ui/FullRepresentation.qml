@@ -1731,11 +1731,11 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: false
                             acceptedButtons: Qt.LeftButton
-                            propagateComposedEvents: true
-                            enabled: fullRoot.ctrlDragSelectActive
+                            // Always enabled; routes non-Ctrl presses through to delegates below
 
                             property real lastLassoX: -1
                             property real lastLassoY: -1
+                            property bool lassoMoved: false
 
                             function selectAtPos(mx, my) {
                                 const idx = emojiGridView.indexAt(mx, my + emojiGridView.contentY)
@@ -1765,31 +1765,52 @@ Item {
                             }
 
                             onPressed: {
-                                lastLassoX = mouse.x
-                                lastLassoY = mouse.y
-                                selectAtPos(mouse.x, mouse.y)
-                                mouse.accepted = false
+                                if (mouse.modifiers & Qt.ControlModifier) {
+                                    // Accept press so we receive positionChanged for drag
+                                    fullRoot.ctrlDragSelectActive = true
+                                    lastLassoX = mouse.x
+                                    lastLassoY = mouse.y
+                                    lassoMoved = false
+                                } else {
+                                    // Not a lasso gesture — pass through to delegate below
+                                    mouse.accepted = false
+                                }
                             }
 
                             onPositionChanged: {
-                                if (fullRoot.ctrlDragSelectActive) {
-                                    // Safety: if button was released outside the grid, cancel lasso
-                                    if (!(mouse.buttons & Qt.LeftButton)) {
-                                        fullRoot.ctrlDragSelectActive = false
-                                        lastLassoX = -1
-                                        lastLassoY = -1
-                                        return
-                                    }
-                                    selectAlongPath(lastLassoX, lastLassoY, mouse.x, mouse.y)
-                                    lastLassoX = mouse.x
-                                    lastLassoY = mouse.y
+                                if (!fullRoot.ctrlDragSelectActive) return
+                                // Safety: cancel if button released outside grid
+                                if (!(mouse.buttons & Qt.LeftButton)) {
+                                    fullRoot.ctrlDragSelectActive = false
+                                    lastLassoX = -1
+                                    lastLassoY = -1
+                                    lassoMoved = false
+                                    return
                                 }
+                                lassoMoved = true
+                                selectAlongPath(lastLassoX, lastLassoY, mouse.x, mouse.y)
+                                lastLassoX = mouse.x
+                                lastLassoY = mouse.y
+                            }
+
+                            onClicked: {
+                                // Fires for Ctrl+press (overlay accepted it)
+                                if (!lassoMoved) {
+                                    // Pure Ctrl+click without drag — toggle via normal handler
+                                    const idx = emojiGridView.indexAt(mouse.x, mouse.y + emojiGridView.contentY)
+                                    if (idx >= 0 && idx < fullRoot.filteredEmojis.length) {
+                                        const item = fullRoot.filteredEmojis[idx]
+                                        handleEmojiSelected(item.emoji, true, false, false)
+                                    }
+                                }
+                                // If lassoMoved, emojis already selected by selectAlongPath
                             }
 
                             onReleased: {
                                 fullRoot.ctrlDragSelectActive = false
                                 lastLassoX = -1
                                 lastLassoY = -1
+                                lassoMoved = false
                             }
                         }
 
@@ -2030,22 +2051,6 @@ Item {
                                     }
                                 }
 
-                                onPressed: {
-                                    if (mouse.button === Qt.LeftButton && (mouse.modifiers & Qt.ControlModifier)) {
-                                        // Map from cell-local coords to GridView coords for the lasso overlay
-                                        const mapped = mouseArea.mapToItem(emojiGridView, mouse.x, mouse.y)
-                                        fullRoot.ctrlDragSelectActive = true
-                                        lassoOverlay.lastLassoX = mapped.x
-                                        lassoOverlay.lastLassoY = mapped.y
-                                        // Don't call selectAtPos here — onClicked handles the initial Ctrl+click selection
-                                    }
-                                }
-
-                                onReleased: {
-                                    if (mouse.button === Qt.LeftButton) {
-                                        fullRoot.ctrlDragSelectActive = false
-                                    }
-                                }
 
                                 onClicked: {
                                     if (mouse.button === Qt.LeftButton) {
