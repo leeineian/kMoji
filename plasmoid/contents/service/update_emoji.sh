@@ -19,6 +19,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# Logging helpers
+_log() { echo "[$(date +"%H:%M:%S")] $*"; }
+_err() { echo "[$(date +"%H:%M:%S")] Error: $*" >&2; }
+
 # ==============================================================================
 # Configuration
 # ==============================================================================
@@ -31,39 +35,37 @@ JS_FILE_PATH="$ASSETS_DIR/emoji-list.js"
 
 trap 'rm -f "$RAW_FILE_PATH"' EXIT
 
-echo "SYNC_STARTED"
-
 # ==============================================================================
 # Dependency Checks
 # ==============================================================================
 for cmd in curl awk date; do
   if ! command -v "$cmd" >/dev/null; then
-    echo "Error: $cmd is required." >&2
+    _err "$cmd is required but not installed."
     exit 1
   fi
 done
 
 if [ ! -d "$ASSETS_DIR" ]; then
-  echo "Error: assets directory does not exist: $ASSETS_DIR" >&2
+  _err "Assets directory not found: $ASSETS_DIR"
   exit 1
 fi
 
 if [ ! -w "$ASSETS_DIR" ]; then
-  echo "Error: assets directory is not writable: $ASSETS_DIR" >&2
+  _err "Assets directory is not writable: $ASSETS_DIR"
   exit 3
 fi
 
 # ==============================================================================
 # Download
 # ==============================================================================
-echo "Downloading $URL to $RAW_FILE_PATH ..."
+_log "Downloading emoji data from Unicode..."
 
 if ! curl --compressed -fsSL "$URL" -o "$RAW_FILE_PATH"; then
-  echo "SYNC_NET_ERROR: failed to download $URL"
+  _err "Failed to download emoji data."
   exit 2
 fi
 
-echo "Download complete."
+_log "Download complete."
 
 # ==============================================================================
 # Checksum Calculation
@@ -78,12 +80,12 @@ elif command -v openssl >/dev/null; then
   checksum=$(openssl dgst -sha256 "$RAW_FILE_PATH" | awk '{print $NF}')
 fi
 
-echo "SHA256 checksum: $checksum"
+_log "SHA256: ${checksum:0:12}..."
 
 # ==============================================================================
 # Parse and Generate JS
 # ==============================================================================
-echo "Parsing and generating JSON..."
+_log "Building emoji list..."
 
 DATE_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 HEADER="// Generated from: $URL\n// Generated on: $DATE_ISO\n// SHA256: $checksum\n\nconst emojiList = "
@@ -189,5 +191,4 @@ awk \
 # Cleanup
 # ==============================================================================
 
-echo "Write complete."
-echo "SYNC_COMPLETE"
+_log "Emoji list updated."

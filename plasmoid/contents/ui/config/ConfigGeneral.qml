@@ -8,6 +8,7 @@ import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as Plasma5Support
 
+import "../../assets/emoji-list.js" as EmojiList
 import "../../assets/emoji-icons.js" as EmojiIcons
 
 Kirigami.ScrollablePage {
@@ -31,7 +32,7 @@ Kirigami.ScrollablePage {
     }
 
     function _randomEmojiFromPool() {
-        const pool = EmojiIcons.getIconEmojis() || []
+        const pool = EmojiIcons.getIconEmojis(EmojiList.emojiList) || []
         if (pool.length === 0) {
             return null
         }
@@ -193,15 +194,16 @@ Kirigami.ScrollablePage {
             }
 
             ScrollView {
+                id: syncScrollView
                 Layout.fillWidth: true
                 Layout.preferredHeight: syncController.logAreaHeight
                 visible: syncController.logVisible
-                
+                clip: true
+
                 background: Rectangle {
-                    color: PlasmaCore.Theme.backgroundColor
-                    border.color: PlasmaCore.Theme.textColor
+                    color: Kirigami.Theme.alternateBackgroundColor
+                    border.color: Kirigami.Theme.highlightColor
                     border.width: 1
-                    opacity: 0.3
                     radius: Kirigami.Units.smallSpacing
                 }
 
@@ -213,7 +215,9 @@ Kirigami.ScrollablePage {
                     font.family: "monospace"
                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                     selectByMouse: true
-                    color: PlasmaCore.Theme.textColor
+                    color: Kirigami.Theme.textColor
+                    background: null
+                    padding: Kirigami.Units.smallSpacing
                 }
             }
 
@@ -227,8 +231,8 @@ Kirigami.ScrollablePage {
                     width: Kirigami.Units.gridUnit * 2
                     height: Math.round(Kirigami.Units.smallSpacing / 2)
                     radius: height / 2
-                    color: PlasmaCore.Theme.textColor
-                    opacity: 0.3
+                    color: Kirigami.Theme.disabledTextColor
+                    opacity: 0.45
                 }
 
                 MouseArea {
@@ -305,8 +309,11 @@ Kirigami.ScrollablePage {
         }
 
         function addSystemLog(message) {
-            const timestamp = new Date().toLocaleTimeString()
-            appendLog(`[${timestamp}] ${message}\n`)
+            const now = new Date()
+            const hh = String(now.getHours()).padStart(2, '0')
+            const mm = String(now.getMinutes()).padStart(2, '0')
+            const ss = String(now.getSeconds()).padStart(2, '0')
+            appendLog(`[${hh}:${mm}:${ss}] ${message}\n`)
         }
 
         function startSync() {
@@ -335,7 +342,7 @@ Kirigami.ScrollablePage {
             // Decode path (e.g. spaces -> %20 handled)
             const cleanPath = decodeURIComponent(path)
             
-            addSystemLog(`Script: ${cleanPath}`)
+            addSystemLog("Sync started.")
 
             // Check if path looks valid (basic sanity check)
             if (cleanPath.length === 0 || cleanPath.includes("undefined")) {
