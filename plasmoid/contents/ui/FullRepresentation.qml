@@ -30,8 +30,6 @@ Item {
     property bool sidebarExpanded: false
     property bool isAnyCategoryDragging: false
     property var selectedEmojis: []
-    // Parallel lookup object — O(1) membership test vs O(n) indexOf on the array.
-    // Must be kept in sync with selectedEmojis at every mutation site.
     property var selectedEmojiSet: ({})
 
     // Search & Feedback
@@ -813,7 +811,6 @@ Item {
         }
     }
 
-    // Handle global key events for navigation
     Keys.onPressed: function(event) {
         if (plasmoid.configuration.KeyboardNavigation) {
             if (event.key === Qt.Key_Escape) {
@@ -821,8 +818,6 @@ Item {
                     event.accepted = true
                     return
             }
-
-
 
                 if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) &&
                     !(event.modifiers & Qt.ControlModifier)) {
@@ -855,7 +850,6 @@ Item {
         }
     }
 
-    // Non-visual helper objects
     ListModel {
         id: categoryModel
     }
@@ -1119,7 +1113,6 @@ Item {
             Layout.fillHeight: true
             spacing: 0
 
-            // --- Sidebar ---
             Item {
                 Layout.fillHeight: true
                 Layout.preferredWidth: fullRoot.sidebarExpanded ? 180 : 32
@@ -1130,7 +1123,6 @@ Item {
                 Item {
                     anchors.fill: parent
 
-                    // Pin Button
                     PlasmaComponents.ToolButton {
                         id: pinButton
                         implicitWidth: fullRoot.sidebarExpanded ? 180 : 32
@@ -1141,8 +1133,6 @@ Item {
                         activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                         KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? settingsButtonInSidebar : null
                         KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? pasteField : null
-
-
 
                         Timer {
                             id: pinKeyboardFeedbackReset
@@ -1252,7 +1242,6 @@ Item {
                         }
                     }
 
-                    // Settings Button
                     PlasmaComponents.ToolButton {
                         id: settingsButtonInSidebar
                         implicitWidth: fullRoot.sidebarExpanded ? 180 : 32
@@ -1375,7 +1364,6 @@ Item {
                         }
                     }
 
-                    // Toggle Button
                     PlasmaComponents.ToolButton {
                         id: sidebarToggleButton
                         implicitWidth: fullRoot.sidebarExpanded ? 180 : 32
@@ -1489,7 +1477,6 @@ Item {
                         }
                     }
 
-                    // Category List
                     ListView {
                         id: categoryListView
                         anchors.top: parent.top
@@ -1519,7 +1506,6 @@ Item {
                             focusPolicy: Qt.StrongFocus
                             activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                             
-                            // Keyboard Navigation Logic
                             KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (index + 1 < categoryListView.count ? (categoryListView.itemAtIndex(index + 1) ? categoryListView.itemAtIndex(index + 1) : emojiGridView) : emojiGridView) : null
                             KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? (index === 0 ? sidebarToggleButton : (categoryListView.itemAtIndex(index - 1) ? categoryListView.itemAtIndex(index - 1) : sidebarToggleButton)) : null
 
@@ -1528,7 +1514,6 @@ Item {
 
                             opacity: fullRoot.isCategoryDragging(index) ? 0.3 : 1.0
                             
-                            // Visual State
                             background: Item {
                                 anchors.fill: parent
                                 anchors.margins: 4

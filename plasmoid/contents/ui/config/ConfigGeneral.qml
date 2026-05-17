@@ -162,20 +162,19 @@ Kirigami.ScrollablePage {
         }
 
         // --- Update Section ---
+
         ConfigSection {
             text: i18n("Update")
         }
 
-        // We use a simplified GroupBox-like look for the logs area
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
-            // Wrapper to center the button robustly
             RowLayout {
                 Layout.fillWidth: true
                 
-                Item { Layout.fillWidth: true } // Left spacer
+                Item { Layout.fillWidth: true }
                 
                 PlasmaComponents.Button {
                     id: syncButton
@@ -190,7 +189,7 @@ Kirigami.ScrollablePage {
                     onClicked: syncController.startSync()
                 }
                 
-                Item { Layout.fillWidth: true } // Right spacer
+                Item { Layout.fillWidth: true }
             }
 
             ScrollView {
@@ -218,7 +217,6 @@ Kirigami.ScrollablePage {
                 }
             }
 
-            // Resize Handle
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.largeSpacing

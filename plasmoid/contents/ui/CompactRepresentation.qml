@@ -6,6 +6,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 
 import "../assets/emoji-icons.js" as IconEmojis
+import "../assets/emoji-list.js" as EmojiList
 
 MouseArea {
     id: compactRoot
@@ -70,7 +71,7 @@ MouseArea {
         const target = expander()
         if (!target || !target.expanded) {
             if (emojiIcons.length === 0) {
-                emojiIcons = IconEmojis.getIconEmojis()
+                emojiIcons = IconEmojis.getIconEmojis(EmojiList.emojiList)
             }
             if (emojiIcons.length > 0) {
                 currentEmojiIndex = Math.floor(Math.random() * emojiIcons.length)
@@ -105,7 +106,7 @@ MouseArea {
 
             text: (compactRoot.emojiIcons && compactRoot.emojiIcons.length > 0) ? compactRoot.emojiIcons[compactRoot.currentEmojiIndex] : ""
             font.pixelSize: Math.min(width, height) * 0.8
-            font.family: "emoji" // Use emoji font family if available
+            font.family: "emoji"
 
             visible: compactRoot.easterEggMode
             opacity: compactRoot.easterEggMode
@@ -113,7 +114,6 @@ MouseArea {
             : 0
             scale: (compactRoot.containsMouse || (expander() && expander().expanded)) ? 1.0 : 1.0
 
-            // Improve rendering quality
             renderType: Text.NativeRendering
             textFormat: Text.PlainText
             smooth: true

@@ -10,14 +10,9 @@ import org.kde.plasma.plasmoid
 PlasmoidItem {
     id: root
 
-    // Plasmoid Configuration
     Plasmoid.icon: "preferences-desktop-emoticons-symbolic"
     preferredRepresentation: compactRepresentation
     hideOnWindowDeactivate: !plasmoid.configuration.AlwaysOpen
-
-    // ==============================================================================
-    // Representations
-    // ==============================================================================
 
     compactRepresentation: CompactRepresentation {
         plasmoidItem: root
