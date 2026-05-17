@@ -31,6 +31,7 @@ Item {
     property bool isAnyCategoryDragging: false
     property var selectedEmojis: []
     property var selectedEmojiSet: ({})
+    property bool ctrlDragSelectActive: false
 
     // Search & Feedback
     property string hoveredEmojiName: ""
@@ -1719,6 +1720,9 @@ Item {
                                     fullRoot.emojiHoveredEmojiKey = ""
                                     fullRoot.hoveredEmojiName = ""
                                 }
+                                if (!hovered) {
+                                    fullRoot.ctrlDragSelectActive = false
+                                }
                             }
                         }
 
@@ -1916,11 +1920,42 @@ Item {
                                     if (emojiGridView && fullRoot.emojiKeyboardNavigationEnabled) {
                                         emojiGridView.currentIndex = index
                                     }
+
+                                    // Ctrl+drag lasso: auto-select emoji when dragging with Ctrl held
+                                    if (fullRoot.ctrlDragSelectActive && !fullRoot.isEmojiSelected(modelData.emoji)) {
+                                        fullRoot.selectedEmojis.push(modelData.emoji)
+                                        fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice()
+                                        const newSet = {}
+                                        for (const e of fullRoot.selectedEmojis) newSet[e] = true
+                                        fullRoot.selectedEmojiSet = newSet
+                                        pasteField.placeholderText = i18n("Selected %1 emoji(s)", fullRoot.selectedEmojis.length)
+                                    }
                                 }
 
                                 onExited: {
                                     if (fullRoot.emojiHoveredEmojiKey === modelData.emoji) {
                                         fullRoot.emojiLastHoveredEmojiKey = modelData.emoji
+                                    }
+                                }
+
+                                onPressed: {
+                                    if (mouse.button === Qt.LeftButton && (mouse.modifiers & Qt.ControlModifier)) {
+                                        fullRoot.ctrlDragSelectActive = true
+                                        // Immediately select the first emoji under the cursor
+                                        if (!fullRoot.isEmojiSelected(modelData.emoji)) {
+                                            fullRoot.selectedEmojis.push(modelData.emoji)
+                                            fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice()
+                                            const newSet = {}
+                                            for (const e of fullRoot.selectedEmojis) newSet[e] = true
+                                            fullRoot.selectedEmojiSet = newSet
+                                            pasteField.placeholderText = i18n("Selected %1 emoji(s)", fullRoot.selectedEmojis.length)
+                                        }
+                                    }
+                                }
+
+                                onReleased: {
+                                    if (mouse.button === Qt.LeftButton) {
+                                        fullRoot.ctrlDragSelectActive = false
                                     }
                                 }
 
