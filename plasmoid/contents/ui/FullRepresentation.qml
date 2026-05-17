@@ -1725,6 +1725,19 @@ Item {
                             }
                         }
 
+                        WheelHandler {
+                            id: gridWheelHandler
+                            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                            onWheel: function(event) {
+                                const step = fullRoot.internalGridSize * 3
+                                const delta = event.angleDelta.y
+                                const newY = emojiGridView.contentY - (delta / 120) * step
+                                emojiGridView.contentY = Math.max(0,
+                                    Math.min(emojiGridView.contentHeight - emojiGridView.height, newY))
+                                event.accepted = true
+                            }
+                        }
+
                         // Single overlay for reliable Ctrl+drag lasso — position-based, never misses cells
                         MouseArea {
                             id: lassoOverlay
