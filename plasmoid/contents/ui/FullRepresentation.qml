@@ -82,27 +82,38 @@ Item {
         return topBlock + separatorHeight + sidebarButtons + categoriesBlock + separatorHeight + bottomBlock
     }
 
+    // ── Constants ────────────────────────────────────────────────────────────
+    // Category keys used throughout filter logic and UI comparisons.
+    // Change once here if the category identifiers ever need to be renamed.
+    readonly property string catAll:       "All"
+    readonly property string catFavorites: "Favorites"
+    readonly property string catRecent:    "Recent"
+
+    // Font sizes for the preview bar and empty-state label.
+    readonly property int fontSizePreviewLabel:  14
+    readonly property int fontSizeEmptyLabel:    16
+
     // Default Categories
     property var defaultCategoryOrder: [
-        { name: "All", displayName: i18n("All"), icon: "view-list-icons" },
-        { name: "Favorites", displayName: i18n("Favorites"), icon: "bookmarks-bookmarked" },
-        { name: "Recent", displayName: i18n("Recent"), icon: "chronometer" },
+        { name: catAll,       displayName: i18n("All"),       icon: "view-list-icons" },
+        { name: catFavorites, displayName: i18n("Favorites"), icon: "bookmarks-bookmarked" },
+        { name: catRecent,    displayName: i18n("Recent"),    icon: "chronometer" },
         { name: "Smileys & Emotion", displayName: i18n("Smileys & Emotion"), icon: "smiley" },
-        { name: "People & Body", displayName: i18n("People & Body"), icon: "im-user" },
-        { name: "Animals & Nature", displayName: i18n("Animals & Nature"), icon: "animal" },
-        { name: "Food & Drink", displayName: i18n("Food & Drink"), icon: "food" },
-        { name: "Activities", displayName: i18n("Activities"), icon: "games-highscores" },
-        { name: "Travel & Places", displayName: i18n("Travel & Places"), icon: "globe" },
-        { name: "Objects", displayName: i18n("Objects"), icon: "object-group" },
-        { name: "Symbols", displayName: i18n("Symbols"), icon: "checkbox" },
-        { name: "Flags", displayName: i18n("Flags"), icon: "flag" }
+        { name: "People & Body",     displayName: i18n("People & Body"),     icon: "im-user" },
+        { name: "Animals & Nature",  displayName: i18n("Animals & Nature"),  icon: "animal" },
+        { name: "Food & Drink",      displayName: i18n("Food & Drink"),      icon: "food" },
+        { name: "Activities",        displayName: i18n("Activities"),        icon: "games-highscores" },
+        { name: "Travel & Places",   displayName: i18n("Travel & Places"),   icon: "globe" },
+        { name: "Objects",           displayName: i18n("Objects"),           icon: "object-group" },
+        { name: "Symbols",           displayName: i18n("Symbols"),           icon: "checkbox" },
+        { name: "Flags",             displayName: i18n("Flags"),             icon: "flag" }
     ]
-    
+
     // Emoji List
     property var emojiList: []
     property string filter: ""
     property var filteredEmojis: []
-    property string selectedCategory: "All"
+    property string selectedCategory: catAll
     property var recentEmojis: []
     property var favoriteEmojis: []
     
@@ -363,21 +374,21 @@ Item {
 
         let result = emojiList
 
-        if (selectedCategory === "Recent") {
+        if (selectedCategory === catRecent) {
             result = recentEmojis
-        } else if (selectedCategory === "Favorites") {
+        } else if (selectedCategory === catFavorites) {
             result = favoriteEmojis
-        } else if (selectedCategory !== "All") {
+        } else if (selectedCategory !== catAll) {
             result = emojiList.filter(e => e.group === selectedCategory)
         }
 
         if (filter && filter.trim() !== "") {
             result = performFilter(result, filter)
 
-            if (result.length === 0 && selectedCategory !== "All") {
+            if (result.length === 0 && selectedCategory !== catAll) {
                 const globalResult = performFilter(emojiList, filter)
                 if (globalResult.length > 0) {
-                    selectedCategory = "All"
+                    selectedCategory = catAll
                     return
                 }
             }
@@ -394,7 +405,7 @@ Item {
     }
 
     onEmojiListChanged: {
-        if (fullRoot.selectedCategory === "All" && !fullRoot.searchPlaceholderMessageActive) {
+        if (fullRoot.selectedCategory === catAll && !fullRoot.searchPlaceholderMessageActive) {
             fullRoot.resetSearchPlaceholder()
         }
     }
@@ -669,7 +680,7 @@ Item {
     }
 
     function getSearchPlaceholder() {
-        if (fullRoot.selectedCategory === "All") {
+        if (fullRoot.selectedCategory === catAll) {
             return i18n("Search %1 emojis...", fullRoot.emojiList.length)
         }
         const emojiCount = fullRoot.filteredEmojis.length
@@ -1610,9 +1621,9 @@ Item {
                                 onClicked: {
                                     if (mouse.button === Qt.RightButton) {
                                         var globalPos = mapToItem(fullRoot, mouse.x, mouse.y)
-                                        if (model.name === "Recent") {
+                                        if (model.name === catRecent) {
                                             recentContextMenu.popup(globalPos.x, globalPos.y)
-                                        } else if (model.name === "Favorites") {
+                                        } else if (model.name === catFavorites) {
                                             favoritesContextMenu.popup(globalPos.x, globalPos.y)
                                         }
                                         mouse.accepted = true
@@ -1898,7 +1909,7 @@ Item {
                 PlasmaComponents.Label {
                     anchors.centerIn: parent
                     text: i18n("No results found :(")
-                    font.pixelSize: 16
+                    font.pixelSize: fontSizeEmptyLabel
                     color: Kirigami.Theme.textColor
                     opacity: 0.6
                     visible: fullRoot.filteredEmojis.length === 0
@@ -1953,7 +1964,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignVCenter
                     text: fullRoot.emojiHoveredEmojiKey !== "" ? fullRoot.hoveredEmojiName : i18n("Hover over an emoji for details...")
-                    font.pixelSize: 14
+                    font.pixelSize: fontSizePreviewLabel
                     font.bold: false
                     elide: Text.ElideRight
                     color: fullRoot.emojiHoveredEmojiKey !== "" ? Kirigami.Theme.textColor : Kirigami.Theme.disabledTextColor
