@@ -1702,7 +1702,7 @@ Item {
                         rightMargin: ScrollBar.vertical.visible ? ScrollBar.vertical.width : 0
                         model: fullRoot.filteredEmojis
                         clip: true
-                        interactive: true
+                        interactive: false
                         flickableDirection: Flickable.VerticalFlick
                         ScrollBar.vertical: ScrollBar {}
 
@@ -1764,9 +1764,24 @@ Item {
                             if (!fullRoot.emojiKeyboardNavigationEnabled) return
 
                                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select) {
-                                    fullRoot.keyboardPressedIndex = currentIndex
-                                    fullRoot.gridKeyboardActionPressed = true
-                                    event.accepted = true
+                                    if (event.modifiers & Qt.ControlModifier) {
+                                        // Ctrl+Enter: toggle selection on current emoji without copying
+                                        if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                            const item = fullRoot.filteredEmojis[currentIndex]
+                                            handleEmojiSelected(item.emoji, true, false, false)
+                                        }
+                                        event.accepted = true
+                                    } else {
+                                        fullRoot.keyboardPressedIndex = currentIndex
+                                        fullRoot.gridKeyboardActionPressed = true
+                                        event.accepted = true
+                                    }
+                                } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right ||
+                                           event.key === Qt.Key_Up   || event.key === Qt.Key_Down) {
+                                    if (event.modifiers & Qt.ControlModifier) {
+                                        fullRoot.ctrlDragSelectActive = true
+                                    }
+                                    // Let the GridView handle movement natively; onCurrentIndexChanged will select
                                 } else if (event.key === Qt.Key_Space) {
                                     if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
                                         const item = fullRoot.filteredEmojis[currentIndex]
@@ -1791,20 +1806,26 @@ Item {
                         }
 
                         Keys.onReleased: function(event) {
+                            // Clear keyboard lasso when Ctrl is released
+                            if (!(event.modifiers & Qt.ControlModifier)) {
+                                fullRoot.ctrlDragSelectActive = false
+                            }
                             if (fullRoot.emojiKeyboardNavigationEnabled &&
                                 (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select)) {
-                                fullRoot.gridKeyboardActionPressed = false
-                                fullRoot.keyboardPressedIndex = -1
-                                const isCtrl = event.modifiers & Qt.ControlModifier
-                                if (!isCtrl && currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                const item = fullRoot.filteredEmojis[currentIndex]
-                                    const isShift = event.modifiers & Qt.ShiftModifier
-                                    const isAlt = event.modifiers & Qt.AltModifier
-                                    handleEmojiSelected(item.emoji, false, isShift, isAlt)
+                                if (!(event.modifiers & Qt.ControlModifier)) {
+                                    fullRoot.gridKeyboardActionPressed = false
+                                    fullRoot.keyboardPressedIndex = -1
+                                    if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                    const item = fullRoot.filteredEmojis[currentIndex]
+                                        const isShift = event.modifiers & Qt.ShiftModifier
+                                        const isAlt = event.modifiers & Qt.AltModifier
+                                        handleEmojiSelected(item.emoji, false, isShift, isAlt)
+                                    }
+                                    event.accepted = true
                                 }
-                                event.accepted = true
                             }
                         }
+
 
                         onActiveFocusChanged: {
                             if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
@@ -1867,6 +1888,20 @@ Item {
                                     const item = fullRoot.filteredEmojis[currentIndex]
                                     if (item) {
                                         fullRoot.emojiLastHoveredEmojiKey = item.emoji
+                                    }
+                                }
+                            }
+                            // Ctrl keyboard lasso: select emoji as cursor moves with Ctrl held
+                            if (fullRoot.emojiKeyboardNavigationEnabled && fullRoot.ctrlDragSelectActive) {
+                                if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                    const lassoItem = fullRoot.filteredEmojis[currentIndex]
+                                    if (lassoItem && !fullRoot.isEmojiSelected(lassoItem.emoji)) {
+                                        fullRoot.selectedEmojis.push(lassoItem.emoji)
+                                        fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice()
+                                        const newSet = {}
+                                        for (const e of fullRoot.selectedEmojis) newSet[e] = true
+                                        fullRoot.selectedEmojiSet = newSet
+                                        pasteField.placeholderText = i18n("Selected %1 emoji(s)", fullRoot.selectedEmojis.length)
                                     }
                                 }
                             }
