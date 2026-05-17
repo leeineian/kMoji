@@ -1959,6 +1959,8 @@ Item {
             id: previewBar
             Layout.fillWidth: true
             Layout.preferredHeight: topSection.implicitHeight + 16
+            Kirigami.Theme.colorSet: Kirigami.Theme.Window
+            Kirigami.Theme.inherit: false
 
             RowLayout {
                 anchors.fill: parent
@@ -1976,7 +1978,7 @@ Item {
                         text: fullRoot.hoveredEmoji
                         font.pixelSize: previewBar.height - 20
                         visible: fullRoot.hoveredEmoji !== ""
-                        color: PlasmaCore.Theme.textColor
+                        color: Kirigami.Theme.textColor
                     }
 
                     Kirigami.Icon {
@@ -1984,7 +1986,7 @@ Item {
                         source: "preferences-desktop-emoticons-symbolic"
                         width: parent.height
                         height: parent.height
-                        color: PlasmaCore.Theme.disabledTextColor
+                        color: Kirigami.Theme.disabledTextColor
                         visible: fullRoot.hoveredEmoji === ""
                     }
                 }
@@ -1996,7 +1998,7 @@ Item {
                     font.pixelSize: 14
                     font.bold: false
                     elide: Text.ElideRight
-                    color: fullRoot.hoveredEmoji !== "" ? PlasmaCore.Theme.textColor : PlasmaCore.Theme.disabledTextColor
+                    color: fullRoot.hoveredEmoji !== "" ? Kirigami.Theme.textColor : Kirigami.Theme.disabledTextColor
                     visible: fullRoot.hoveredEmoji === "" || fullRoot.hoveredEmojiName !== ""
                 }
             }
