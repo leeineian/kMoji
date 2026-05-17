@@ -1122,6 +1122,12 @@ Item {
                 Layout.preferredWidth: fullRoot.sidebarExpanded ? 180 : 32
                 Layout.maximumWidth: 180
 
+                Rectangle {
+                    anchors.fill: parent
+                    color: PlasmaCore.Theme.backgroundColor
+                    opacity: 1.0
+                }
+
                 Item {
                     anchors.fill: parent
 
@@ -1680,6 +1686,12 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
+                Rectangle {
+                    anchors.fill: parent
+                    color: PlasmaCore.Theme.backgroundColor
+                    opacity: 1.0
+                }
+
                 RowLayout {
                     anchors.fill: parent
                     spacing: 0
@@ -2007,6 +2019,7 @@ Item {
                         text: fullRoot.hoveredEmoji
                         font.pixelSize: previewBar.height - 20
                         visible: fullRoot.hoveredEmoji !== ""
+                        color: PlasmaCore.Theme.textColor
                     }
 
                     Kirigami.Icon {
