@@ -136,7 +136,7 @@ Kirigami.ScrollablePage {
 
             PlasmaComponents.CheckBox {
                 id: alwaysOpen
-                text: i18n("Pin popup to screen when opened")
+                text: i18n("Pin popup in place when opened")
             }
 
             PlasmaComponents.CheckBox {
