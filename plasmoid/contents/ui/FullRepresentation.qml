@@ -1720,8 +1720,6 @@ Item {
                                     fullRoot.emojiHoveredEmojiKey = ""
                                     fullRoot.hoveredEmojiName = ""
                                 }
-                                // Do NOT cancel ctrlDragSelectActive here — cursor may re-enter the grid
-                                // while still holding Ctrl+mouse button
                             }
                         }
 
@@ -1738,13 +1736,12 @@ Item {
                             }
                         }
 
-                        // Single overlay for reliable Ctrl+drag lasso — position-based, never misses cells
                         MouseArea {
                             id: lassoOverlay
                             anchors.fill: parent
                             hoverEnabled: false
                             acceptedButtons: Qt.LeftButton
-                            // Always enabled; routes non-Ctrl presses through to delegates below
+
 
                             property real lastLassoX: -1
                             property real lastLassoY: -1
@@ -1779,20 +1776,17 @@ Item {
 
                             onPressed: {
                                 if (mouse.modifiers & Qt.ControlModifier) {
-                                    // Accept press so we receive positionChanged for drag
                                     fullRoot.ctrlDragSelectActive = true
                                     lastLassoX = mouse.x
                                     lastLassoY = mouse.y
                                     lassoMoved = false
                                 } else {
-                                    // Not a lasso gesture — pass through to delegate below
                                     mouse.accepted = false
                                 }
                             }
 
                             onPositionChanged: {
                                 if (!fullRoot.ctrlDragSelectActive) return
-                                // Safety: cancel if button released outside grid
                                 if (!(mouse.buttons & Qt.LeftButton)) {
                                     fullRoot.ctrlDragSelectActive = false
                                     lastLassoX = -1
@@ -1807,16 +1801,13 @@ Item {
                             }
 
                             onClicked: {
-                                // Fires for Ctrl+press (overlay accepted it)
                                 if (!lassoMoved) {
-                                    // Pure Ctrl+click without drag — toggle via normal handler
                                     const idx = emojiGridView.indexAt(mouse.x, mouse.y + emojiGridView.contentY)
                                     if (idx >= 0 && idx < fullRoot.filteredEmojis.length) {
                                         const item = fullRoot.filteredEmojis[idx]
                                         handleEmojiSelected(item.emoji, true, false, false)
                                     }
                                 }
-                                // If lassoMoved, emojis already selected by selectAlongPath
                             }
 
                             onReleased: {
@@ -1866,7 +1857,6 @@ Item {
 
                                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select) {
                                     if (event.modifiers & Qt.ControlModifier) {
-                                        // Ctrl+Enter: toggle selection on current emoji without copying
                                         if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
                                             const item = fullRoot.filteredEmojis[currentIndex]
                                             handleEmojiSelected(item.emoji, true, false, false)
@@ -1882,7 +1872,6 @@ Item {
                                     if (event.modifiers & Qt.ControlModifier) {
                                         fullRoot.ctrlDragSelectActive = true
                                     }
-                                    // Let the GridView handle movement natively; onCurrentIndexChanged will select
                                 } else if (event.key === Qt.Key_Space) {
                                     if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
                                         const item = fullRoot.filteredEmojis[currentIndex]
@@ -1907,7 +1896,6 @@ Item {
                         }
 
                         Keys.onReleased: function(event) {
-                            // Clear keyboard lasso when Ctrl is released
                             if (!(event.modifiers & Qt.ControlModifier)) {
                                 fullRoot.ctrlDragSelectActive = false
                             }
@@ -1992,7 +1980,6 @@ Item {
                                     }
                                 }
                             }
-                            // Ctrl keyboard lasso: select emoji as cursor moves with Ctrl held
                             if (fullRoot.emojiKeyboardNavigationEnabled && fullRoot.ctrlDragSelectActive) {
                                 if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
                                     const lassoItem = fullRoot.filteredEmojis[currentIndex]
