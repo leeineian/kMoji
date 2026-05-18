@@ -14,6 +14,7 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 
 import "../assets/emoji-list.js" as EmojiList
+import "../assets/kitchen-metadata.js" as KitchenMetadata
 
 Item {
     id: fullRoot
@@ -56,6 +57,7 @@ Item {
     property string emojiLastHoveredEmojiKey: ""
     property bool emojiKeyboardNavigationEnabled: plasmoid.configuration.KeyboardNavigation
     property Item emojiTabNextTarget: searchField
+    property Item currentGridView: selectedCategory === catEmojiKitchen ? kitchenView : emojiGridView
     property Item emojiTabPreviousTarget: categoryListView.count > 0 ? (categoryListView.itemAtIndex(categoryListView.count - 1) ? categoryListView.itemAtIndex(categoryListView.count - 1) : sidebarToggleButton) : sidebarToggleButton
 
     // Height Calculation Properties
@@ -87,9 +89,10 @@ Item {
     // ── Constants ────────────────────────────────────────────────────────────
     // Category keys used throughout filter logic and UI comparisons.
     // Change once here if the category identifiers ever need to be renamed.
-    readonly property string catAll:       "All"
-    readonly property string catFavorites: "Favorites"
-    readonly property string catRecent:    "Recent"
+    readonly property string catAll:          "All"
+    readonly property string catFavorites:    "Favorites"
+    readonly property string catRecent:       "Recent"
+    readonly property string catEmojiKitchen: "Emoji Kitchen"
 
     // Font sizes for the preview bar and empty-state label.
     readonly property int fontSizePreviewLabel:  14
@@ -97,6 +100,7 @@ Item {
 
     // Default Categories
     property var defaultCategoryOrder: [
+        { name: catEmojiKitchen, displayName: i18n("Emoji Kitchen"), icon: "path-union-symbolic" },
         { name: catAll,       displayName: i18n("All"),       icon: "view-list-icons" },
         { name: catFavorites, displayName: i18n("Favorites"), icon: "bookmarks-bookmarked" },
         { name: catRecent,    displayName: i18n("Recent"),    icon: "chronometer" },
@@ -385,7 +389,7 @@ Item {
             result = recentEmojis
         } else if (selectedCategory === catFavorites) {
             result = favoriteEmojis
-        } else if (selectedCategory !== catAll) {
+        } else if (selectedCategory !== catAll && selectedCategory !== catEmojiKitchen) {
             result = emojiList.filter(e => e.group === selectedCategory)
         }
 
@@ -730,7 +734,18 @@ Item {
         if (fullRoot.selectedCategory === catAll) {
             return i18n("Search %1 emojis...", fullRoot.emojiList.length)
         }
-        const emojiCount = fullRoot.filteredEmojis.length
+        
+        let emojiCount = fullRoot.filteredEmojis.length
+        if (fullRoot.selectedCategory === catEmojiKitchen && kitchenView) {
+            // Count only emojis that have kitchen support
+            let bases = Object.keys(KitchenMetadata.kitchenMetadata);
+            let kitchenCount = fullRoot.filteredEmojis.filter(e => {
+                let cp = kitchenView.getCodepoint(e.emoji);
+                return bases.includes(cp);
+            }).length;
+            emojiCount = kitchenCount;
+        }
+
         if (emojiCount === 0) return i18n("Search emojis…")
         return i18n("Search %1 emojis…", emojiCount)
     }
@@ -812,6 +827,21 @@ Item {
         if (savedOrder && savedOrder.length > 0) {
             try {
                 var parsed = JSON.parse(savedOrder)
+                
+                // Check if Emoji Kitchen is missing (it was previously not a category)
+                var hasKitchen = false
+                for (var k = 0; k < parsed.length; k++) {
+                    if (parsed[k].name === catEmojiKitchen) {
+                        hasKitchen = true
+                        // Force update icon
+                        parsed[k].icon = "path-union-symbolic"
+                        break
+                    }
+                }
+                if (!hasKitchen) {
+                    parsed.unshift({ name: catEmojiKitchen, icon: "path-union-symbolic" })
+                }
+
                 categoryModel.clear()
                 for (var i = 0; i < parsed.length; i++) {
                     if (parsed[i].name === "Activities") {
@@ -932,7 +962,7 @@ Item {
             Layout.fillWidth: true
             implicitHeight: topSection.implicitHeight + 16
 
-            ColumnLayout {
+            RowLayout {
                 id: topSection
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -940,21 +970,17 @@ Item {
                 anchors.margins: 8
                 spacing: 8
 
-                RowLayout {
+                PlasmaExtras.SearchField {
+                    id: searchField
                     Layout.fillWidth: true
-                    spacing: 8
+                    Layout.preferredWidth: 0
+                    placeholderText: fullRoot.searchPlaceholderText
+                    text: fullRoot.filter
+                    focus: true
+                    activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
+                    KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? pasteField : null
 
-                    PlasmaExtras.SearchField {
-                        id: searchField
-                        Layout.fillWidth: true
-                        Layout.preferredWidth: 0
-                        placeholderText: fullRoot.searchPlaceholderText
-                        text: fullRoot.filter
-                        focus: true
-                        activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
-                        KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? pasteField : null
-                        KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? emojiGridView : null
-
+                    KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView) : null
                         onTextChanged: {
                             fullRoot.filter = text
                         }
@@ -1141,9 +1167,9 @@ Item {
                     }
                 }
             }
-        }
 
-        Kirigami.Separator {
+            Kirigami.Separator {
+
             Layout.fillWidth: true
         }
 
@@ -1415,7 +1441,7 @@ Item {
                         focusPolicy: Qt.StrongFocus
                         activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                         KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? settingsButtonInSidebar : null
-                        KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (categoryListView.count > 0 ? (categoryListView.itemAtIndex(0) ? categoryListView.itemAtIndex(0) : emojiGridView) : emojiGridView) : null
+                        KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (categoryListView.count > 0 ? (categoryListView.itemAtIndex(0) ? categoryListView.itemAtIndex(0) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView)) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView)) : null
 
 
 
@@ -1548,7 +1574,7 @@ Item {
                             focusPolicy: Qt.StrongFocus
                             activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                             
-                            KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (index + 1 < categoryListView.count ? (categoryListView.itemAtIndex(index + 1) ? categoryListView.itemAtIndex(index + 1) : emojiGridView) : emojiGridView) : null
+                            KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (index + 1 < categoryListView.count ? (categoryListView.itemAtIndex(index + 1) ? categoryListView.itemAtIndex(index + 1) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView)) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView)) : null
                             KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? (index === 0 ? sidebarToggleButton : (categoryListView.itemAtIndex(index - 1) ? categoryListView.itemAtIndex(index - 1) : sidebarToggleButton)) : null
 
                             Keys.onReturnPressed: clicked()
@@ -1689,9 +1715,343 @@ Item {
                 Layout.fillHeight: true
                 Kirigami.Theme.colorSet: Kirigami.Theme.Window
                 Kirigami.Theme.inherit: false
+                
+                // --- Emoji Kitchen View (Inline) ---
+                Item {
+                    id: kitchenView
+                    anchors.fill: parent
+                    visible: fullRoot.selectedCategory === fullRoot.catEmojiKitchen
+
+                    property string emoji1: ""
+                    property string emoji2: ""
+                    property string resultUrl: ""
+                    property string resultUrlAlternative: ""
+                    property string _actualSource: ""
+                    property string currentValidUrl: ""
+
+                    onResultUrlChanged: _actualSource = resultUrl
+
+                    readonly property int slotSize: 128
+
+                    function getCodepoint(emoji) {
+                        if (!emoji) return "";
+                        let res = [];
+                        for (let char of emoji) {
+                            let cp = char.codePointAt(0).toString(16);
+                            res.push(cp);
+                        }
+                        return res.join("-");
+                    }
+
+                    function updateResult() {
+                        if (emoji1 === "" || emoji2 === "") {
+                            resultUrl = ""
+                            resultUrlAlternative = ""
+                            currentValidUrl = ""
+                            return
+                        }
+
+                        let cp1 = getCodepoint(emoji1);
+                        let cp2 = getCodepoint(emoji2);
+
+                        let data = KitchenMetadata.kitchenMetadata[cp1];
+                        if (data) {
+                            let combo = data.find(c => c.e === cp2);
+                            if (combo) {
+                                let date = combo.d;
+                                resultUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + date + "/" + cp1 + "/" + cp1 + "_" + cp2 + ".png";
+                                resultUrlAlternative = "https://www.gstatic.com/android/keyboard/emojikitchen/" + date + "/" + cp2 + "/" + cp2 + "_" + cp1 + ".png";
+                                return;
+                            }
+                        }
+
+                        // Try reverse
+                        data = KitchenMetadata.kitchenMetadata[cp2];
+                        if (data) {
+                            let combo = data.find(c => c.e === cp1);
+                            if (combo) {
+                                let date = combo.d;
+                                resultUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + date + "/" + cp2 + "/" + cp2 + "_" + cp1 + ".png";
+                                resultUrlAlternative = "https://www.gstatic.com/android/keyboard/emojikitchen/" + date + "/" + cp1 + "/" + cp1 + "_" + cp2 + ".png";
+                                return;
+                            }
+                        }
+
+                        resultUrl = "";
+                        resultUrlAlternative = "";
+                        currentValidUrl = "";
+                    }
+
+                    onEmoji1Changed: updateResult()
+                    onEmoji2Changed: updateResult()
+
+                    function copyResult() {
+                        if (currentValidUrl !== "") {
+                            clipboard.content = currentValidUrl
+                            fullRoot.showCopiedFeedback("Emoji Kitchen", i18n("Sticker URL"))
+                        }
+                    }
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 0
+
+                        // --- Selection and Result Area ---
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 16
+                            Layout.leftMargin: 16
+                            Layout.rightMargin: 16
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: 16
+
+                            // Slot 1
+                            Rectangle {
+                                id: slot1
+                                width: kitchenView.slotSize
+                                height: kitchenView.slotSize
+                                color: Kirigami.Theme.backgroundColor
+                                border.color: (activeFocus || kitchenView.emoji1 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                border.width: (activeFocus || kitchenView.emoji1 === "") ? 2 : 1
+                                radius: 8
+                                
+                                focusPolicy: Qt.StrongFocus
+                                activeFocusOnTab: true
+                                KeyNavigation.tab: slot2
+                                KeyNavigation.backtab: fullRoot.emojiTabPreviousTarget
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: kitchenView.emoji1 === "" ? "?" : kitchenView.emoji1
+                                    font.pixelSize: kitchenView.emoji1 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
+                                    font.family: kitchenView.emoji1 === "" ? "" : "Noto Color Emoji"
+                                    color: Kirigami.Theme.textColor
+                                    opacity: kitchenView.emoji1 === "" ? 0.2 : 1.0
+                                    renderType: kitchenView.emoji1 === "" ? Text.QtRendering : Text.NativeRendering
+                                }
+                                
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        slot1.forceActiveFocus()
+                                        kitchenView.emoji1 = ""
+                                    }
+                                }
+
+                                Keys.onReturnPressed: kitchenView.emoji1 = ""
+                                Keys.onEnterPressed: kitchenView.emoji1 = ""
+                            }
+
+                            Text {
+                                text: "+"
+                                font.pixelSize: 24
+                                color: Kirigami.Theme.textColor
+                                opacity: 0.6
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+
+                            // Slot 2
+                            Rectangle {
+                                id: slot2
+                                width: kitchenView.slotSize
+                                height: kitchenView.slotSize
+                                color: Kirigami.Theme.backgroundColor
+                                border.color: (activeFocus || kitchenView.emoji2 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                border.width: (activeFocus || kitchenView.emoji2 === "") ? 2 : 1
+                                radius: 8
+                                
+                                focusPolicy: Qt.StrongFocus
+                                activeFocusOnTab: true
+                                KeyNavigation.tab: resultSlot
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: kitchenView.emoji2 === "" ? "?" : kitchenView.emoji2
+                                    font.pixelSize: kitchenView.emoji2 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
+                                    font.family: kitchenView.emoji2 === "" ? "" : "Noto Color Emoji"
+                                    color: Kirigami.Theme.textColor
+                                    opacity: kitchenView.emoji2 === "" ? 0.2 : 1.0
+                                    renderType: kitchenView.emoji2 === "" ? Text.QtRendering : Text.NativeRendering
+                                }
+                                
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        slot2.forceActiveFocus()
+                                        kitchenView.emoji2 = ""
+                                    }
+                                }
+
+                                Keys.onReturnPressed: kitchenView.emoji2 = ""
+                                Keys.onEnterPressed: kitchenView.emoji2 = ""
+                            }
+
+                            Text {
+                                text: "="
+                                font.pixelSize: 24
+                                color: Kirigami.Theme.textColor
+                                opacity: 0.6
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+
+                            // Result
+                            Rectangle {
+                                id: resultSlot
+                                width: kitchenView.slotSize
+                                height: kitchenView.slotSize
+                                color: Kirigami.Theme.backgroundColor
+                                border.color: (activeFocus || kitchenView.resultUrl !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                border.width: (activeFocus || kitchenView.resultUrl === "") ? 2 : 1
+                                radius: 8
+                                
+                                focusPolicy: Qt.StrongFocus
+                                activeFocusOnTab: true
+                                KeyNavigation.tab: clearButton
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "?"
+                                    font.pixelSize: Math.floor(kitchenView.slotSize * 0.6)
+                                    color: Kirigami.Theme.textColor
+                                    opacity: 0.2
+                                }
+
+                                Image {
+                                    id: resultImage
+                                    anchors.fill: parent
+                                    anchors.margins: 6
+                                    source: kitchenView._actualSource
+                                    fillMode: Image.PreserveAspectFit
+                                    opacity: (status === Image.Ready && kitchenView.resultUrl !== "") ? 1.0 : 0.0
+                                    smooth: true
+                                    mipmap: true
+                                    asynchronous: true
+                                    
+                                    Behavior on opacity {
+                                        NumberAnimation { duration: 150 }
+                                    }
+                                    
+                                    onStatusChanged: {
+                                        if (status === Image.Ready) {
+                                            kitchenView.currentValidUrl = source.toString()
+                                        } else if (status === Image.Error && source.toString() === kitchenView.resultUrl && kitchenView.resultUrlAlternative !== "") {
+                                            kitchenView._actualSource = kitchenView.resultUrlAlternative
+                                        }
+                                    }
+                                }
+                                
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: kitchenView.currentValidUrl !== ""
+                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    onClicked: {
+                                        resultSlot.forceActiveFocus()
+                                        kitchenView.copyResult()
+                                    }
+                                }
+
+                                Keys.onReturnPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
+                                Keys.onEnterPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
+                            }
+                        }
+                        
+                        // --- Action Buttons ---
+                        RowLayout {
+                            Layout.alignment: Qt.AlignHCenter
+                            Layout.leftMargin: 16
+                            Layout.rightMargin: 16
+                            spacing: 8
+                            
+                            PlasmaComponents.ToolButton {
+                                id: clearButton
+                                display: PlasmaComponents.ToolButton.IconOnly
+                                icon.name: "edit-clear-all"
+                                activeFocusOnTab: true
+                                onClicked: {
+                                    kitchenView.emoji1 = ""
+                                    kitchenView.emoji2 = ""
+                                }
+                                PlasmaComponents.ToolTip { text: i18n("Clear All") }
+                            }
+
+                            PlasmaComponents.ToolButton {
+                                id: copyButton
+                                display: PlasmaComponents.ToolButton.IconOnly
+                                icon.name: "edit-copy"
+                                activeFocusOnTab: true
+                                enabled: kitchenView.currentValidUrl !== ""
+                                onClicked: kitchenView.copyResult()
+                                PlasmaComponents.ToolTip { text: i18n("Copy Result") }
+                            }
+                        }
+
+                        // --- Grid Area ---
+                        Kirigami.Separator {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 16
+                        }
+
+                        GridView {
+                            id: kitchenGridView
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            cellWidth: fullRoot.internalGridSize
+                            cellHeight: fullRoot.internalGridSize
+                            clip: true
+                            model: fullRoot.filteredEmojis
+                            
+                            activeFocusOnTab: true
+
+                            delegate: Item {
+                                width: fullRoot.internalGridSize
+                                height: fullRoot.internalGridSize
+                                
+                                Rectangle {
+                                    anchors.fill: parent
+                                    anchors.margins: 2
+                                    color: Kirigami.Theme.highlightColor
+                                    radius: 4
+                                    opacity: (mouseArea.containsMouse || activeFocus) ? 0.2 : 0
+                                }
+                                
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: modelData.emoji
+                                    font.pixelSize: Math.floor(fullRoot.internalGridSize * 0.7)
+                                    renderType: Text.NativeRendering
+                                }
+                                
+                                MouseArea {
+                                    id: mouseArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onEntered: {
+                                        fullRoot.emojiHoveredEmojiKey = modelData.emoji
+                                        fullRoot.hoveredEmojiName = modelData.name
+                                    }
+                                    onExited: {
+                                        fullRoot.emojiHoveredEmojiKey = ""
+                                        fullRoot.hoveredEmojiName = ""
+                                    }
+                                    onClicked: {
+                                        if (kitchenView.emoji1 === "") {
+                                            kitchenView.emoji1 = modelData.emoji
+                                        } else {
+                                            kitchenView.emoji2 = modelData.emoji
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 RowLayout {
                     anchors.fill: parent
                     spacing: 0
+                    visible: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen
 
                     GridView {
                         id: emojiGridView
@@ -2007,15 +2367,14 @@ Item {
                                     anchors.fill: parent
                                     color: Kirigami.Theme.highlightColor
                                     radius: 4
-                                    opacity: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || (index === fullRoot.keyboardPressedIndex)) ? 1.0 :
-                                    (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
+                                    opacity: (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
                                 }
 
                                 Rectangle {
                                     anchors.fill: parent
                                     color: "transparent"
                                     radius: 4
-                                    border.width: (mouseArea.pressed || fullRoot.isEmojiSelected(modelData.emoji) || fullRoot.isEmojiKeyboardPressed(GridView.isCurrentItem) || mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
+                                    border.width: (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
                                     border.color: Kirigami.Theme.highlightColor
                                 }
                             }
@@ -2113,8 +2472,10 @@ Item {
                         anchors.centerIn: parent
                         text: fullRoot.emojiHoveredEmojiKey
                         font.pixelSize: previewBar.height - 20
+                        font.family: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? "Noto Color Emoji" : undefined
                         visible: fullRoot.emojiHoveredEmojiKey !== ""
                         color: Kirigami.Theme.textColor
+                        renderType: Text.NativeRendering
                     }
 
                     Kirigami.Icon {
@@ -2220,7 +2581,7 @@ Item {
     Shortcut {
         sequences: ["Ctrl+Return", "Ctrl+Enter"]
         context: Qt.ApplicationShortcut
-        enabled: true
+        enabled: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen
         onActivated: {
             if (!plasmoid.configuration.KeyboardNavigation) return
             if (typeof getCurrentFocusedEmoji === "function") {
