@@ -1741,44 +1741,51 @@ Item {
                         if (!emoji) return "";
                         return [...emoji].map(c => c.codePointAt(0).toString(16)).join("-");
                     }
-                    
+
                     function updateResult() {
                         if (emoji1 !== "" && emoji2 !== "") {
                             let cp1 = getCodepoint(emoji1);
                             let cp2 = getCodepoint(emoji2);
                             
                             let findCombo = (c1, c2) => {
-                                let base = KitchenMetadata.kitchenMetadata[c1];
-                                if (base) return base.find(c => c.e === c2);
+                                let stripFE0F = (s) => s.replace(/-fe0f/g, "");
+                                let c1_norm = stripFE0F(c1);
+                                let c2_norm = stripFE0F(c2);
                                 
-                                // Loose match: try without fe0f
-                                let c1_loose = c1.replace(/-fe0f/g, "");
-                                base = KitchenMetadata.kitchenMetadata[c1_loose];
-                                if (base) return base.find(c => {
-                                    let e_loose = c.e.replace(/-fe0f/g, "");
-                                    return e_loose === c2.replace(/-fe0f/g, "");
-                                });
+                                let base = KitchenMetadata.kitchenMetadata[c1];
+                                if (base) {
+                                    let exact = base.find(c => stripFE0F(c.e) === c2_norm);
+                                    if (exact) return { entry: exact, b: c1, p: exact.e };
+                                }
+                                
+                                base = KitchenMetadata.kitchenMetadata[c1_norm];
+                                if (base) {
+                                    let loose = base.find(c => stripFE0F(c.e) === c2_norm);
+                                    if (loose) return { entry: loose, b: c1_norm, p: loose.e };
+                                }
                                 return null;
                             };
 
                             let combo = findCombo(cp1, cp2) || findCombo(cp2, cp1);
                             
                             if (combo) {
-                                let urlCp = (cp) => "u" + cp.replace(/-fe0f/g, "").replace(/-/g, "-u");
+                                let stripFE0F = (s) => s.replace(/-fe0f/g, "");
+                                let toUrl = (cp) => "u" + cp.replace(/-/g, "-u");
                                 
-                                let u1 = urlCp(cp1);
-                                let u2 = urlCp(cp2);
-                                let cps = [u1, u2].sort();
+                                let folder = toUrl(stripFE0F(combo.b));
+                                let filename = toUrl(combo.b) + "_" + toUrl(combo.p);
                                 
-                                resultUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + combo.d + "/" + cps[0] + "/" + cps[0] + "_" + cps[1] + ".png";
+                                resultUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + combo.entry.d + "/" + folder + "/" + filename + ".png";
+                                resultUrlAlternative = "";
                             } else {
                                 resultUrl = "";
+                                resultUrlAlternative = "";
                             }
                         } else {
                             resultUrl = "";
+                            resultUrlAlternative = "";
                         }
                     }
-
                     onEmoji1Changed: updateResult()
                     onEmoji2Changed: updateResult()
 
@@ -1786,7 +1793,6 @@ Item {
                         if (!cp) return "";
                         return cp.split("-").map(part => String.fromCodePoint(parseInt(part, 16))).join("");
                     }
-
                     function randomize() {
                         let bases = Object.keys(KitchenMetadata.kitchenMetadata);
                         if (bases.length > 0) {
