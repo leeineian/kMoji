@@ -1720,7 +1720,7 @@ Item {
                 Kirigami.Theme.colorSet: Kirigami.Theme.Window
                 Kirigami.Theme.inherit: false
                 
-                // --- Emoji Kitchen View (Inline) ---
+                // --- Emoji Kitchen View ---
                 Item {
                     id: kitchenView
                     anchors.fill: parent
@@ -1737,81 +1737,75 @@ Item {
 
                     readonly property int slotSize: 160
 
+                    function getCodepoint(emoji) {
+                        if (!emoji) return "";
+                        return [...emoji].map(c => c.codePointAt(0).toString(16)).join("-");
+                    }
+                    
                     function updateResult() {
-                        if (emoji1 === "" || emoji2 === "") {
-                            resultUrl = ""
-                            resultUrlAlternative = ""
-                            currentValidUrl = ""
-                            return
-                        }
+                        if (emoji1 !== "" && emoji2 !== "") {
+                            let cp1 = getCodepoint(emoji1);
+                            let cp2 = getCodepoint(emoji2);
+                            
+                            let findCombo = (c1, c2) => {
+                                let base = KitchenMetadata.kitchenMetadata[c1];
+                                if (base) return base.find(c => c.e === c2);
+                                
+                                // Loose match: try without fe0f
+                                let c1_loose = c1.replace(/-fe0f/g, "");
+                                base = KitchenMetadata.kitchenMetadata[c1_loose];
+                                if (base) return base.find(c => {
+                                    let e_loose = c.e.replace(/-fe0f/g, "");
+                                    return e_loose === c2.replace(/-fe0f/g, "");
+                                });
+                                return null;
+                            };
 
-                        let cp1 = getCodepoint(emoji1);
-                        let cp2 = getCodepoint(emoji2);
-
-                        let data = KitchenMetadata.kitchenMetadata[cp1];
-                        if (data) {
-                            let combo = data.find(c => c.e === cp2);
+                            let combo = findCombo(cp1, cp2) || findCombo(cp2, cp1);
+                            
                             if (combo) {
-                                let date = combo.d;
-                                resultUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + date + "/" + cp1 + "/" + cp1 + "_" + cp2 + ".png";
-                                resultUrlAlternative = "https://www.gstatic.com/android/keyboard/emojikitchen/" + date + "/" + cp2 + "/" + cp2 + "_" + cp1 + ".png";
-                                return;
+                                let urlCp = (cp) => "u" + cp.replace(/-fe0f/g, "").replace(/-/g, "-u");
+                                
+                                let u1 = urlCp(cp1);
+                                let u2 = urlCp(cp2);
+                                let cps = [u1, u2].sort();
+                                
+                                resultUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + combo.d + "/" + cps[0] + "/" + cps[0] + "_" + cps[1] + ".png";
+                            } else {
+                                resultUrl = "";
                             }
+                        } else {
+                            resultUrl = "";
                         }
-
-                        // Try reverse
-                        data = KitchenMetadata.kitchenMetadata[cp2];
-                        if (data) {
-                            let combo = data.find(c => c.e === cp1);
-                            if (combo) {
-                                let date = combo.d;
-                                resultUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + date + "/" + cp2 + "/" + cp2 + "_" + cp1 + ".png";
-                                resultUrlAlternative = "https://www.gstatic.com/android/keyboard/emojikitchen/" + date + "/" + cp1 + "/" + cp1 + "_" + cp2 + ".png";
-                                return;
-                            }
-                        }
-
-                        resultUrl = "";
-                        resultUrlAlternative = "";
-                        currentValidUrl = "";
                     }
 
                     onEmoji1Changed: updateResult()
                     onEmoji2Changed: updateResult()
 
-                    function copyResult() {
-                        if (currentValidUrl !== "") {
-                            clipboard.content = currentValidUrl
-                            fullRoot.showCopiedFeedback("Emoji Kitchen", i18n("Sticker URL"))
+                    function emojiFromCodepoint(cp) {
+                        if (!cp) return "";
+                        return cp.split("-").map(part => String.fromCodePoint(parseInt(part, 16))).join("");
+                    }
+
+                    function randomize() {
+                        let bases = Object.keys(KitchenMetadata.kitchenMetadata);
+                        if (bases.length > 0) {
+                            let cp1 = bases[Math.floor(Math.random() * bases.length)];
+                            let partners = KitchenMetadata.kitchenMetadata[cp1];
+                            if (partners && partners.length > 0) {
+                                let partnerEntry = partners[Math.floor(Math.random() * partners.length)];
+                                let cp2 = partnerEntry.e;
+                                
+                                emoji1 = emojiFromCodepoint(cp1);
+                                emoji2 = emojiFromCodepoint(cp2);
+                            }
                         }
                     }
-
-                    function swapEmojis() {
-                        let temp = emoji1;
-                        emoji1 = emoji2;
-                        emoji2 = temp;
-                    }
-
-                    function randomizeEmojis() {
-                        const bases = Object.keys(KitchenMetadata.kitchenMetadata);
-                        if (bases.length < 2) return;
-                        
-                        let r1 = Math.floor(Math.random() * bases.length);
-                        let r2 = Math.floor(Math.random() * bases.length);
-                        
-                        // Try to find an actual combination
-                        let cp1 = bases[r1];
-                        let combos = KitchenMetadata.kitchenMetadata[cp1];
-                        if (combos && combos.length > 0) {
-                            let rCombo = Math.floor(Math.random() * combos.length);
-                            let cp2 = combos[rCombo].e;
-                            
-                            // Find emojis in emojiList by codepoint
-                            let e1 = fullRoot.emojiList.find(e => getCodepoint(e.emoji) === cp1);
-                            let e2 = fullRoot.emojiList.find(e => getCodepoint(e.emoji) === cp2);
-                            
-                            if (e1) emoji1 = e1.emoji;
-                            if (e2) emoji2 = e2.emoji;
+                    
+                    function copyResult() {
+                        if (resultUrl !== "") {
+                            let cmd = 'curl -sL "' + resultUrl + '" > /tmp/kmoji_copy.png && (wl-copy --type image/png < /tmp/kmoji_copy.png || xclip -selection clipboard -t image/png -i /tmp/kmoji_copy.png)'
+                            shellSource.connectSource(cmd)
                         }
                     }
 
@@ -2001,7 +1995,11 @@ Item {
                                 activeFocusOnTab: true
                                 KeyNavigation.tab: randomizeButton
                                 KeyNavigation.backtab: resultSlot
-                                onClicked: kitchenView.swapEmojis()
+                                onClicked: {
+                                    let temp = kitchenView.emoji1;
+                                    kitchenView.emoji1 = kitchenView.emoji2;
+                                    kitchenView.emoji2 = temp;
+                                }
                                 PlasmaComponents.ToolTip { text: i18n("Swap Emojis") }
                             }
 
@@ -2012,7 +2010,7 @@ Item {
                                 activeFocusOnTab: true
                                 KeyNavigation.tab: clearButton
                                 KeyNavigation.backtab: swapButton
-                                onClicked: kitchenView.randomizeEmojis()
+                                onClicked: kitchenView.randomize()
                                 PlasmaComponents.ToolTip { text: i18n("Randomize") }
                             }
 
