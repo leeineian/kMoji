@@ -1769,21 +1769,30 @@ Item {
                             let combo = findCombo(cp1, cp2) || findCombo(cp2, cp1);
                             
                             if (combo) {
+                                // Folder: strip FE0F variation selectors for the folder path.
+                                // Filename: use the full codepoint string.
                                 let stripFE0F = (s) => s.replace(/-fe0f/g, "");
                                 let toUrl = (cp) => "u" + cp.replace(/-/g, "-u");
                                 
-                                let folder = toUrl(stripFE0F(combo.b));
-                                let filename = toUrl(combo.b) + "_" + toUrl(combo.p);
+                                let folder1 = toUrl(stripFE0F(combo.b));
+                                let filename1 = toUrl(combo.b) + "_" + toUrl(combo.p);
                                 
-                                resultUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + combo.entry.d + "/" + folder + "/" + filename + ".png";
-                                resultUrlAlternative = "";
+                                // Reverse variation (some combos are indexed as Base+Partner but server stores Partner+Base)
+                                let folder2 = toUrl(stripFE0F(combo.p));
+                                let filename2 = toUrl(combo.p) + "_" + toUrl(combo.b);
+                                
+                                let baseUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + combo.entry.d + "/";
+                                resultUrl = baseUrl + folder1 + "/" + filename1 + ".png";
+                                resultUrlAlternative = baseUrl + folder2 + "/" + filename2 + ".png";
+                                
+                                console.log("DEBUG: Generated Primary URL", resultUrl);
+                                console.log("DEBUG: Generated Alt URL", resultUrlAlternative);
                             } else {
                                 resultUrl = "";
                                 resultUrlAlternative = "";
                             }
                         } else {
                             resultUrl = "";
-                            resultUrlAlternative = "";
                         }
                     }
                     onEmoji1Changed: updateResult()
