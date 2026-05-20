@@ -984,7 +984,7 @@ Item {
                     activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                     KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? pasteField : null
 
-                    KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView) : null
+                    KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenGridView : emojiGridView) : null
                         onTextChanged: {
                             fullRoot.filter = text
                         }
@@ -2096,6 +2096,41 @@ Item {
                             activeFocusOnTab: true
                             KeyNavigation.tab: searchField
                             KeyNavigation.backtab: copyButton
+
+                            keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
+                            keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
+
+                            Keys.onPressed: function(event) {
+                                if (!fullRoot.emojiKeyboardNavigationEnabled) return
+
+                                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                    if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                        kitchenView.emoji1 = fullRoot.filteredEmojis[currentIndex].emoji
+                                    }
+                                    event.accepted = true
+                                } else if (event.key === Qt.Key_Space) {
+                                    if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                        kitchenView.emoji2 = fullRoot.filteredEmojis[currentIndex].emoji
+                                    }
+                                    event.accepted = true
+                                } else if (event.key === Qt.Key_Escape) {
+                                    handleEscapePressed()
+                                    event.accepted = true
+                                } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                                    const backwards = (event.key === Qt.Key_Backtab) || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))
+                                    if (!backwards) {
+                                        searchField.forceActiveFocus()
+                                        event.accepted = true
+                                    } else {
+                                        if (copyButton.enabled) {
+                                            copyButton.forceActiveFocus()
+                                        } else {
+                                            clearButton.forceActiveFocus()
+                                        }
+                                        event.accepted = true
+                                    }
+                                }
+                            }
 
                             ScrollBar.vertical: ScrollBar {
                                 active: kitchenGridView.moving || kitchenGridView.contentHeight > kitchenGridView.height
