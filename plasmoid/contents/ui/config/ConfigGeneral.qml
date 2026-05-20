@@ -24,6 +24,8 @@ Kirigami.ScrollablePage {
     property alias cfg_CloseAfterSelection: closeAfterSelection.checked
     property alias cfg_KeyboardNavigation: keyboardNavigation.checked
     property alias cfg_AlwaysOpen: alwaysOpen.checked
+    property alias cfg_KlipyApiKey: klipyApiKey.text
+    property alias cfg_KlipyCopyAction: klipyCopyActionCombo.currentIndex
 
     function emojiFontPixelSize(gridSize) {
         const size = gridSize || 0
@@ -159,6 +161,34 @@ Kirigami.ScrollablePage {
                     leftPadding: 0
                     rightPadding: 0
                 }
+            }
+        }
+
+        // --- GIF Integration Section ---
+        ConfigSection {
+            text: i18n("GIFs (Klipy)")
+        }
+
+        Kirigami.FormLayout {
+            Layout.fillWidth: true
+
+            TextField {
+                id: klipyApiKey
+                Kirigami.FormData.label: i18n("Klipy API Key:")
+                placeholderText: i18n("Enter your Klipy API key")
+                echoMode: TextInput.PasswordEchoOnEdit
+                Layout.fillWidth: true
+            }
+
+            ComboBox {
+                id: klipyCopyActionCombo
+                Kirigami.FormData.label: i18n("Clipboard Click Action:")
+                Layout.fillWidth: true
+                model: [
+                    i18n("Copy Raw GIF File"),
+                    i18n("Copy GIF URL Link"),
+                    i18n("Copy Both File & Link")
+                ]
             }
         }
 

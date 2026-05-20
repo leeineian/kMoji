@@ -58,7 +58,11 @@ Item {
     property string emojiLastHoveredEmojiKey: ""
     property bool emojiKeyboardNavigationEnabled: plasmoid.configuration.KeyboardNavigation
     property Item emojiTabNextTarget: searchField
-    property Item currentGridView: selectedCategory === catEmojiKitchen ? kitchenView : emojiGridView
+    property Item currentGridView: {
+        if (selectedCategory === catEmojiKitchen) return kitchenView;
+        if (selectedCategory === catGifs) return gifView;
+        return emojiGridView;
+    }
     property Item emojiTabPreviousTarget: categoryListView.count > 0 ? (categoryListView.itemAtIndex(categoryListView.count - 1) ? categoryListView.itemAtIndex(categoryListView.count - 1) : sidebarToggleButton) : sidebarToggleButton
 
     // Height Calculation Properties
@@ -94,6 +98,10 @@ Item {
     readonly property string catFavorites:    "Favorites"
     readonly property string catRecent:       "Recent"
     readonly property string catEmojiKitchen: "Emoji Kitchen"
+    readonly property string catGifs:         "GIFs"
+
+    property string hoveredGifTitle: ""
+    property string hoveredGifUrl: ""
 
     // Font sizes for the preview bar and empty-state label.
     readonly property int fontSizePreviewLabel:  14
@@ -102,6 +110,7 @@ Item {
     // Default Categories
     property var defaultCategoryOrder: [
         { name: catEmojiKitchen, displayName: i18n("Emoji Kitchen"), icon: "path-union-symbolic" },
+        { name: catGifs,         displayName: i18n("GIFs (Klipy)"),   icon: "image-gif" },
         { name: catAll,       displayName: i18n("All"),       icon: "view-list-icons" },
         { name: catFavorites, displayName: i18n("Favorites"), icon: "bookmarks-bookmarked" },
         { name: catRecent,    displayName: i18n("Recent"),    icon: "chronometer" },
@@ -389,6 +398,11 @@ Item {
     }
 
     function updateFilteredEmojis() {
+        if (selectedCategory === catGifs) {
+            filteredEmojis = [];
+            return
+        }
+
         if (emojiList.length === 0) {
             filteredEmojis = [];
             return
@@ -828,15 +842,22 @@ Item {
                 var parsed = JSON.parse(savedOrder)
                 
                 var hasKitchen = false
+                var hasGifs = false
                 for (var k = 0; k < parsed.length; k++) {
                     if (parsed[k].name === catEmojiKitchen) {
                         hasKitchen = true
                         parsed[k].icon = "path-union-symbolic"
-                        break
+                    }
+                    if (parsed[k].name === catGifs) {
+                        hasGifs = true
+                        parsed[k].icon = "image-gif"
                     }
                 }
                 if (!hasKitchen) {
                     parsed.unshift({ name: catEmojiKitchen, icon: "path-union-symbolic" })
+                }
+                if (!hasGifs) {
+                    parsed.splice(hasKitchen ? 1 : 0, 0, { name: catGifs, icon: "image-gif" })
                 }
 
                 categoryModel.clear()
@@ -2353,10 +2374,212 @@ Item {
                         }
                 }
 
+                // --- Klipy GIF View ---
+                Item {
+                    id: gifView
+                    anchors.fill: parent
+                    visible: fullRoot.selectedCategory === fullRoot.catGifs
+
+                    property bool isLoading: false
+
+                    ListModel {
+                        id: gifModel
+                    }
+
+                    Plasma5Support.DataSource {
+                        id: gifShellSource
+                        engine: "executable"
+                        connectedSources: []
+                        onNewData: (source, data) => {
+                            disconnectSource(source)
+                        }
+                    }
+
+                    onVisibleChanged: {
+                        if (visible) {
+                            gifView.fetchGifs(fullRoot.filter)
+                        } else {
+                            fullRoot.hoveredGifTitle = ""
+                            fullRoot.hoveredGifUrl = ""
+                        }
+                    }
+
+                    Connections {
+                        target: fullRoot
+                        function onFilterChanged() {
+                            if (fullRoot.selectedCategory === fullRoot.catGifs) {
+                                gifSearchTimer.restart()
+                            }
+                        }
+                    }
+
+                    Timer {
+                        id: gifSearchTimer
+                        interval: 500
+                        repeat: false
+                        running: false
+                        onTriggered: {
+                            gifView.fetchGifs(fullRoot.filter)
+                        }
+                    }
+
+                    function fetchGifs(query) {
+                        gifView.isLoading = true
+                        var apiKey = plasmoid.configuration.KlipyApiKey || "c9d81d227b0b4b2fb4e0bd6f6e52003c"
+                        var url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/search?query=" + encodeURIComponent(query) + "&per_page=24"
+
+                        if (!query || query.trim() === "") {
+                            url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/trending?per_page=24"
+                        }
+
+                        var xhr = new XMLHttpRequest()
+                        xhr.open("GET", url)
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === XMLHttpRequest.DONE) {
+                                gifView.isLoading = false
+                                if (xhr.status === 200) {
+                                    var response = JSON.parse(xhr.responseText)
+                                    if (response.result && response.data && response.data.data) {
+                                        gifModel.clear()
+                                        var list = response.data.data
+                                        for (var i = 0; i < list.length; i++) {
+                                            var item = list[i]
+                                            var rawGif = item.file && item.file.hd && item.file.hd.gif ? item.file.hd.gif.url : ""
+                                            var previewGif = item.file && item.file.sm && item.file.sm.gif ? item.file.sm.gif.url : rawGif
+
+                                            if (rawGif !== "") {
+                                                gifModel.append({
+                                                    title: item.title || "Klipy GIF",
+                                                    rawUrl: rawGif,
+                                                    previewUrl: previewGif
+                                                })
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    console.log("ERROR: Klipy API returned status: " + xhr.status)
+                                }
+                            }
+                        }
+                        xhr.send()
+                    }
+
+                    function copyGif(gifUrl, title) {
+                        if (!gifUrl) return;
+
+                        var copyAction = plasmoid.configuration.KlipyCopyAction
+                        var cmd = ""
+                        var tmpFile = "/tmp/kmoji_" + Date.now() + ".gif"
+
+                        var downloadCmd = 'curl -sL "' + gifUrl + '" > ' + tmpFile
+                        var wlCopyFile = 'wl-copy --type image/gif < ' + tmpFile
+                        var xclipFile = 'xclip -selection clipboard -t image/gif -i ' + tmpFile
+                        var wlCopyText = 'wl-copy "' + gifUrl + '"'
+                        var xclipText = 'echo -n "' + gifUrl + '" | xclip -selection clipboard'
+
+                        if (copyAction === 0) {
+                            cmd = downloadCmd + ' && (' + wlCopyFile + ' || ' + xclipFile + ')'
+                        } else if (copyAction === 1) {
+                            cmd = wlCopyText + ' || ' + xclipText
+                        } else {
+                            cmd = downloadCmd + ' && (' + wlCopyFile + ' || ' + xclipFile + ') && (' + wlCopyText + ' || ' + xclipText + ')'
+                        }
+
+                        gifShellSource.connectSource(cmd)
+                        fullRoot.showPasteTemporaryMessage(i18n("Copied GIF to clipboard!"))
+                    }
+
+                    // --- Custom Busy Indicator Loader ---
+                    PlasmaComponents.BusyIndicator {
+                        id: gifLoadingIndicator
+                        anchors.centerIn: parent
+                        running: gifView.isLoading || gifSearchTimer.running
+                        visible: running
+                    }
+
+                    // --- Empty / Error state label ---
+                    PlasmaComponents.Label {
+                        anchors.centerIn: parent
+                        text: fullRoot.filter !== "" ? i18n("No GIFs found :(") : i18n("No internet or Klipy API error")
+                        visible: !gifView.isLoading && !gifSearchTimer.running && gifModel.count === 0
+                        font.pixelSize: fullRoot.fontSizeEmptyLabel
+                        opacity: 0.6
+                    }
+
+                    // --- Scrollable Grid ---
+                    GridView {
+                        id: gifGridView
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        clip: true
+                        visible: !gifView.isLoading && !gifSearchTimer.running && gifModel.count > 0
+
+                        readonly property int scrollBarWidth: (ScrollBar.vertical && ScrollBar.vertical.visible) ? ScrollBar.vertical.width : 0
+                        readonly property int availableWidth: width - scrollBarWidth - 4
+                        readonly property int numColumns: Math.max(2, Math.floor(availableWidth / 110))
+
+                        cellWidth: Math.floor(availableWidth / numColumns)
+                        cellHeight: Math.floor(cellWidth * 0.8)
+                        model: gifModel
+
+                        ScrollBar.vertical: ScrollBar {
+                            policy: ScrollBar.AsNeeded
+                        }
+
+                        delegate: PC3.ItemDelegate {
+                            width: gifGridView.cellWidth
+                            height: gifGridView.cellHeight
+
+                            background: Rectangle {
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                color: Kirigami.Theme.alternateBackgroundColor
+                                radius: 6
+                                border.width: gifHoverHandler.hovered ? 2 : 0
+                                border.color: Kirigami.Theme.highlightColor
+
+                                AnimatedImage {
+                                    id: gifImage
+                                    source: model.previewUrl
+                                    anchors.fill: parent
+                                    anchors.margins: gifHoverHandler.hovered ? 2 : 4
+                                    fillMode: Image.PreserveAspectCrop
+                                    playing: gifHoverHandler.hovered
+                                    paused: !gifHoverHandler.hovered
+                                    cache: true
+                                }
+
+                                HoverHandler {
+                                    id: gifHoverHandler
+                                    onHoveredChanged: {
+                                        if (hovered) {
+                                            fullRoot.hoveredGifTitle = model.title
+                                            fullRoot.hoveredGifUrl = model.previewUrl
+                                        } else {
+                                            if (fullRoot.hoveredGifUrl === model.previewUrl) {
+                                                fullRoot.hoveredGifTitle = ""
+                                                fullRoot.hoveredGifUrl = ""
+                                            }
+                                        }
+                                    }
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        gifView.copyGif(model.rawUrl, model.title)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 RowLayout {
                     anchors.fill: parent
                     spacing: 0
-                    visible: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen
+                    visible: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen && fullRoot.selectedCategory !== fullRoot.catGifs
 
                     GridView {
                         id: emojiGridView
@@ -2744,7 +2967,7 @@ Item {
                     font.pixelSize: fontSizeEmptyLabel
                     color: Kirigami.Theme.textColor
                     opacity: 0.6
-                    visible: fullRoot.filteredEmojis.length === 0
+                    visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.selectedCategory !== fullRoot.catEmojiKitchen && fullRoot.filteredEmojis.length === 0
                 }
             }
         }
@@ -2779,30 +3002,43 @@ Item {
                         text: fullRoot.emojiHoveredEmojiKey
                         font.pixelSize: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? Math.floor((previewBar.height - 20) * 1.18) : (previewBar.height - 20)
                         font.family: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? "Noto Color Emoji" : undefined
-                        visible: fullRoot.emojiHoveredEmojiKey !== ""
+                        visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.emojiHoveredEmojiKey !== ""
                         color: Kirigami.Theme.textColor
                         renderType: Text.NativeRendering
                     }
 
+                    AnimatedImage {
+                        anchors.fill: parent
+                        source: fullRoot.hoveredGifUrl
+                        fillMode: Image.PreserveAspectFit
+                        visible: fullRoot.selectedCategory === fullRoot.catGifs && fullRoot.hoveredGifUrl !== ""
+                        playing: true
+                    }
+
                     Kirigami.Icon {
                         anchors.centerIn: parent
-                        source: "preferences-desktop-emoticons-symbolic"
+                        source: fullRoot.selectedCategory === fullRoot.catGifs ? "image-gif" : "preferences-desktop-emoticons-symbolic"
                         width: parent.height
                         height: parent.height
                         color: Kirigami.Theme.disabledTextColor
-                        visible: fullRoot.emojiHoveredEmojiKey === ""
+                        visible: fullRoot.selectedCategory === fullRoot.catGifs ? (fullRoot.hoveredGifUrl === "") : (fullRoot.emojiHoveredEmojiKey === "")
                     }
                 }
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignVCenter
-                    text: fullRoot.emojiHoveredEmojiKey !== "" ? fullRoot.hoveredEmojiName : i18n("Hover over an emoji for details...")
+                    text: {
+                        if (fullRoot.selectedCategory === fullRoot.catGifs) {
+                            return fullRoot.hoveredGifTitle !== "" ? fullRoot.hoveredGifTitle : i18n("Hover over a GIF to animate it. Click to copy!")
+                        }
+                        return fullRoot.emojiHoveredEmojiKey !== "" ? fullRoot.hoveredEmojiName : i18n("Hover over an emoji for details...")
+                    }
                     font.pixelSize: fontSizePreviewLabel
                     font.bold: false
                     elide: Text.ElideRight
-                    color: fullRoot.emojiHoveredEmojiKey !== "" ? Kirigami.Theme.textColor : Kirigami.Theme.disabledTextColor
-                    visible: fullRoot.emojiHoveredEmojiKey === "" || fullRoot.hoveredEmojiName !== ""
+                    color: (fullRoot.emojiHoveredEmojiKey !== "" || (fullRoot.selectedCategory === fullRoot.catGifs && fullRoot.hoveredGifTitle !== "")) ? Kirigami.Theme.textColor : Kirigami.Theme.disabledTextColor
+                    visible: true
                 }
             }
         }
@@ -2887,7 +3123,7 @@ Item {
     Shortcut {
         sequences: ["Ctrl+Return", "Ctrl+Enter"]
         context: Qt.ApplicationShortcut
-        enabled: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen
+        enabled: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen && fullRoot.selectedCategory !== fullRoot.catGifs
         onActivated: {
             if (!plasmoid.configuration.KeyboardNavigation) return
             if (typeof getCurrentFocusedEmoji === "function") {
