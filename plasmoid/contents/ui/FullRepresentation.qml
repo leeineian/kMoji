@@ -2158,6 +2158,8 @@ Item {
                             cellHeight: fullRoot.internalGridSize
                             rightMargin: ScrollBar.vertical.visible ? ScrollBar.vertical.width : 0
                             clip: true
+                            interactive: false
+                            flickableDirection: Flickable.VerticalFlick
                             model: fullRoot.filteredEmojis
                             
                             activeFocusOnTab: true
@@ -2166,6 +2168,19 @@ Item {
 
                             keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
                             keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
+
+                            WheelHandler {
+                                id: kitchenGridWheelHandler
+                                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                                onWheel: function(event) {
+                                    const step = fullRoot.internalGridSize * 3
+                                    const delta = event.angleDelta.y
+                                    const newY = kitchenGridView.contentY - (delta / 120) * step
+                                    kitchenGridView.contentY = Math.max(0,
+                                        Math.min(kitchenGridView.contentHeight - kitchenGridView.height, newY))
+                                    event.accepted = true
+                                }
+                            }
 
                             HoverHandler {
                                 id: kitchenGridHoverHandler
