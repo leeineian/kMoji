@@ -753,6 +753,9 @@ Item {
     }
 
     function getSearchPlaceholder() {
+        if (fullRoot.selectedCategory === catGifs) {
+            return i18n("Search GIFs...")
+        }
         if (fullRoot.selectedCategory === catAll) {
             return i18n("Search %1 emojis...", fullRoot.emojiList.length)
         }
@@ -1011,6 +1014,16 @@ Item {
 
                         Keys.onReturnPressed: {
                             if (!plasmoid.configuration.KeyboardNavigation) return
+                            if (fullRoot.selectedCategory === fullRoot.catGifs) {
+                                if (fullRoot.hoveredGifUrl && typeof gifView !== "undefined" && gifView) {
+                                    gifView.copyGif(fullRoot.hoveredGifUrl, fullRoot.hoveredGifTitle)
+                                    if (plasmoid.configuration.CloseAfterSelection) {
+                                        if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
+                                    }
+                                    searchField.text = ""
+                                }
+                                return
+                            }
 
                                 if (fullRoot.selectedEmojis.length > 0) {
                                     const combined = fullRoot.selectedEmojis.join("")
@@ -2382,8 +2395,28 @@ Item {
 
                     property bool isLoading: false
 
-                    ListModel {
-                        id: gifModel
+                    ListModel { id: gifCol0Model }
+                    ListModel { id: gifCol1Model }
+                    ListModel { id: gifCol2Model }
+                    property var colModels: [gifCol0Model, gifCol1Model, gifCol2Model]
+                    property var rawGifsList: []
+                    property int gifCol0Height: 0
+                    property int gifCol1Height: 0
+                    property int gifCol2Height: 0
+
+                    onWidthChanged: {
+                        redistributeTimer.restart()
+                    }
+
+                    Timer {
+                        id: redistributeTimer
+                        interval: 100
+                        repeat: false
+                        onTriggered: {
+                            if (gifView.visible) {
+                                gifView.redistributeGifs()
+                            }
+                        }
                     }
 
                     Plasma5Support.DataSource {
@@ -2423,10 +2456,48 @@ Item {
                         }
                     }
 
+                    function redistributeGifs() {
+                        gifCol0Model.clear()
+                        gifCol1Model.clear()
+                        gifCol2Model.clear()
+
+                        var numCols = masonryRow.numColumns
+                        var colWidth = masonryRow.columnWidth
+                        var space = masonryRow.spacing
+                        var colHeights = [0, 0, 0]
+
+                        for (var i = 0; i < rawGifsList.length; i++) {
+                            var item = rawGifsList[i]
+                            
+                            var minCol = 0
+                            var minHeight = colHeights[0]
+                            for (var c = 1; c < numCols; c++) {
+                                if (colHeights[c] < minHeight) {
+                                    minHeight = colHeights[c]
+                                    minCol = c
+                                }
+                            }
+
+                            colModels[minCol].append({
+                                title: item.title,
+                                rawUrl: item.rawUrl,
+                                previewUrl: item.previewUrl,
+                                aspectRatio: item.aspectRatio
+                            })
+
+                            var cardHeight = Math.floor(colWidth / item.aspectRatio)
+                            colHeights[minCol] += cardHeight + space
+                        }
+
+                        gifCol0Height = colHeights[0]
+                        gifCol1Height = colHeights[1]
+                        gifCol2Height = colHeights[2]
+                    }
+
                     function fetchGifs(query) {
                         gifView.isLoading = true
-                        var apiKey = plasmoid.configuration.KlipyApiKey || "c9d81d227b0b4b2fb4e0bd6f6e52003c"
-                        var url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/search?query=" + encodeURIComponent(query) + "&per_page=24"
+                        var apiKey = (plasmoid.configuration.KlipyApiKey || "c9d81d227b0b4b2fb4e0bd6f6e52003c").trim()
+                        var url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/search?q=" + encodeURIComponent(query) + "&per_page=24"
 
                         if (!query || query.trim() === "") {
                             url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/trending?per_page=24"
@@ -2440,21 +2511,30 @@ Item {
                                 if (xhr.status === 200) {
                                     var response = JSON.parse(xhr.responseText)
                                     if (response.result && response.data && response.data.data) {
-                                        gifModel.clear()
                                         var list = response.data.data
+                                        var parsed = []
                                         for (var i = 0; i < list.length; i++) {
                                             var item = list[i]
+                                            var fileObj = item.file && item.file.sm && item.file.sm.gif ? item.file.sm.gif : null
+                                            if (!fileObj) continue
+
                                             var rawGif = item.file && item.file.hd && item.file.hd.gif ? item.file.hd.gif.url : ""
-                                            var previewGif = item.file && item.file.sm && item.file.sm.gif ? item.file.sm.gif.url : rawGif
+                                            var previewGif = fileObj.url
+                                            var w = fileObj.width || 200
+                                            var h = fileObj.height || 200
+                                            var ratio = w / h
 
                                             if (rawGif !== "") {
-                                                gifModel.append({
+                                                parsed.push({
                                                     title: item.title || "Klipy GIF",
                                                     rawUrl: rawGif,
-                                                    previewUrl: previewGif
+                                                    previewUrl: previewGif,
+                                                    aspectRatio: ratio
                                                 })
                                             }
                                         }
+                                        rawGifsList = parsed
+                                        redistributeGifs()
                                     }
                                 } else {
                                     console.log("ERROR: Klipy API returned status: " + xhr.status)
@@ -2501,38 +2581,22 @@ Item {
                     PlasmaComponents.Label {
                         anchors.centerIn: parent
                         text: fullRoot.filter !== "" ? i18n("No GIFs found :(") : i18n("No internet or Klipy API error")
-                        visible: !gifView.isLoading && !gifSearchTimer.running && gifModel.count === 0
+                        visible: !gifView.isLoading && !gifSearchTimer.running && gifCol0Model.count === 0 && gifCol1Model.count === 0 && gifCol2Model.count === 0
                         font.pixelSize: fullRoot.fontSizeEmptyLabel
                         opacity: 0.6
                     }
 
-                    // --- Scrollable Grid ---
-                    GridView {
-                        id: gifGridView
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        clip: true
-                        visible: !gifView.isLoading && !gifSearchTimer.running && gifModel.count > 0
+                    // --- Component delegate for the masonry elements ---
+                    Component {
+                        id: gifDelegate
 
-                        readonly property int scrollBarWidth: (ScrollBar.vertical && ScrollBar.vertical.visible) ? ScrollBar.vertical.width : 0
-                        readonly property int availableWidth: width - scrollBarWidth - 4
-                        readonly property int numColumns: Math.max(2, Math.floor(availableWidth / 110))
-
-                        cellWidth: Math.floor(availableWidth / numColumns)
-                        cellHeight: Math.floor(cellWidth * 0.8)
-                        model: gifModel
-
-                        ScrollBar.vertical: ScrollBar {
-                            policy: ScrollBar.AsNeeded
-                        }
-
-                        delegate: PC3.ItemDelegate {
-                            width: gifGridView.cellWidth
-                            height: gifGridView.cellHeight
+                        PC3.ItemDelegate {
+                            width: masonryRow.columnWidth
+                            height: Math.floor(width / model.aspectRatio)
 
                             background: Rectangle {
                                 anchors.fill: parent
-                                anchors.margins: 4
+                                anchors.margins: 2
                                 color: Kirigami.Theme.alternateBackgroundColor
                                 radius: 6
                                 border.width: gifHoverHandler.hovered ? 2 : 0
@@ -2542,8 +2606,8 @@ Item {
                                     id: gifImage
                                     source: model.previewUrl
                                     anchors.fill: parent
-                                    anchors.margins: gifHoverHandler.hovered ? 2 : 4
-                                    fillMode: Image.PreserveAspectCrop
+                                    anchors.margins: gifHoverHandler.hovered ? 1 : 2
+                                    fillMode: Image.Stretch
                                     playing: gifHoverHandler.hovered
                                     paused: !gifHoverHandler.hovered
                                     cache: true
@@ -2570,6 +2634,83 @@ Item {
                                     onClicked: {
                                         gifView.copyGif(model.rawUrl, model.title)
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    // --- Scrollable Masonry Waterfall View ---
+                    Flickable {
+                        id: gifFlickable
+                        anchors.fill: parent
+                        anchors.leftMargin: 4
+                        anchors.topMargin: 0
+                        anchors.bottomMargin: 0
+                        anchors.rightMargin: 0
+                        contentWidth: width
+                        contentHeight: Math.max(col0.childrenRect.height, col1.childrenRect.height, col2.childrenRect.height) + 20
+                        clip: true
+                        visible: !gifView.isLoading && !gifSearchTimer.running && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0)
+
+                        ScrollBar.vertical: ScrollBar {}
+
+                        WheelHandler {
+                            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                            onWheel: function(event) {
+                                const step = 120
+                                const delta = event.angleDelta.y
+                                const newY = gifFlickable.contentY - (delta / 120) * step
+                                gifFlickable.contentY = Math.max(0, Math.min(gifFlickable.contentHeight - gifFlickable.height, newY))
+                                event.accepted = true
+                            }
+                        }
+
+                        Row {
+                            id: masonryRow
+                            anchors.top: parent.top
+                            anchors.topMargin: 4
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.rightMargin: (gifFlickable.ScrollBar.vertical && gifFlickable.ScrollBar.vertical.visible) ? gifFlickable.ScrollBar.vertical.width : 4
+                            spacing: 6
+
+                            readonly property int numColumns: width > 360 ? 3 : 2
+                            readonly property int columnWidth: Math.floor((width - (numColumns - 1) * spacing) / numColumns)
+
+                            Column {
+                                id: col0
+                                spacing: 6
+                                width: masonryRow.columnWidth
+                                anchors.top: parent.top
+
+                                Repeater {
+                                    model: gifCol0Model
+                                    delegate: gifDelegate
+                                }
+                            }
+
+                            Column {
+                                id: col1
+                                spacing: 6
+                                width: masonryRow.columnWidth
+                                anchors.top: parent.top
+
+                                Repeater {
+                                    model: gifCol1Model
+                                    delegate: gifDelegate
+                                }
+                            }
+
+                            Column {
+                                id: col2
+                                spacing: 6
+                                width: masonryRow.columnWidth
+                                visible: masonryRow.numColumns === 3
+                                anchors.top: parent.top
+
+                                Repeater {
+                                    model: gifCol2Model
+                                    delegate: gifDelegate
                                 }
                             }
                         }
