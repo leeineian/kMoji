@@ -1735,7 +1735,10 @@ Item {
 
                     onResultUrlChanged: _actualSource = resultUrl
 
-                    readonly property int slotSize: 160
+                    readonly property int slotSize: {
+                        let calculated = Math.floor((kitchenView.width - 144) / 3)
+                        return Math.min(160, Math.max(48, calculated))
+                    }
 
                     function getCodepoint(emoji) {
                         if (!emoji) return "";
@@ -1837,11 +1840,17 @@ Item {
                             Layout.alignment: Qt.AlignHCenter
                             spacing: 16
 
+                            Item {
+                                Layout.fillWidth: true
+                            }
+
                             // Slot 1
                             Rectangle {
                                 id: slot1
                                 width: kitchenView.slotSize
                                 height: kitchenView.slotSize
+                                Layout.preferredWidth: kitchenView.slotSize
+                                Layout.preferredHeight: kitchenView.slotSize
                                 color: Kirigami.Theme.backgroundColor
                                 border.color: (activeFocus || kitchenView.emoji1 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
                                 border.width: (activeFocus || kitchenView.emoji1 === "") ? 2 : 1
@@ -1888,6 +1897,8 @@ Item {
                                 id: slot2
                                 width: kitchenView.slotSize
                                 height: kitchenView.slotSize
+                                Layout.preferredWidth: kitchenView.slotSize
+                                Layout.preferredHeight: kitchenView.slotSize
                                 color: Kirigami.Theme.backgroundColor
                                 border.color: (activeFocus || kitchenView.emoji2 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
                                 border.width: (activeFocus || kitchenView.emoji2 === "") ? 2 : 1
@@ -1934,6 +1945,8 @@ Item {
                                 id: resultSlot
                                 width: kitchenView.slotSize
                                 height: kitchenView.slotSize
+                                Layout.preferredWidth: kitchenView.slotSize
+                                Layout.preferredHeight: kitchenView.slotSize
                                 color: Kirigami.Theme.backgroundColor
                                 border.color: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
                                 border.width: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl === "") ? 2 : 1
@@ -1972,7 +1985,7 @@ Item {
                                         if (status === Image.Ready) {
                                             kitchenView.currentValidUrl = source.toString()
                                         } else if (status === Image.Error && source.toString() === kitchenView.resultUrl && kitchenView.resultUrlAlternative !== "") {
-                                            kitchenView._actualSource = kitchenView.resultUrlAlternative
+                                             kitchenView._actualSource = kitchenView.resultUrlAlternative
                                         }
                                     }
                                 }
@@ -1991,6 +2004,10 @@ Item {
 
                                 Keys.onReturnPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
                                 Keys.onEnterPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
+                            }
+
+                            Item {
+                                Layout.fillWidth: true
                             }
                         }
                         
