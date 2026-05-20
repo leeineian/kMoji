@@ -531,7 +531,6 @@ Item {
     }
 
     function isEmojiSelected(emoji) {
-        // O(1) object lookup instead of O(n) array scan
         return !!fullRoot.selectedEmojiSet[emoji]
     }
 
@@ -542,10 +541,6 @@ Item {
     function isEmojiKeyboardPressed(isCurrent) {
         return isCurrent && (fullRoot.gridKeyboardActionPressed || fullRoot.gridExternalKeyboardActionPressed)
     }
-
-    // isEmojiHovered removed: mouseArea.containsMouse in each delegate covers the
-    // same condition locally without causing all visible cells to re-evaluate
-    // their bindings whenever emojiHoveredEmojiKey changes at the root level.
 
     function isEmojiLastHovered(emoji, gridMouseOver) {
         return fullRoot.emojiLastHoveredEmojiKey === emoji && !gridMouseOver
@@ -677,7 +672,6 @@ Item {
             }
             fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice()
 
-            // Rebuild the O(1) lookup set from the authoritative array
             const newSet = {}
             for (const e of fullRoot.selectedEmojis) newSet[e] = true
             fullRoot.selectedEmojiSet = newSet
@@ -833,12 +827,10 @@ Item {
             try {
                 var parsed = JSON.parse(savedOrder)
                 
-                // Check if Emoji Kitchen is missing (it was previously not a category)
                 var hasKitchen = false
                 for (var k = 0; k < parsed.length; k++) {
                     if (parsed[k].name === catEmojiKitchen) {
                         hasKitchen = true
-                        // Force update icon
                         parsed[k].icon = "path-union-symbolic"
                         break
                     }
@@ -1666,7 +1658,7 @@ Item {
                                 onPositionChanged: {
                                     if (fullRoot.isCategoryDragging(index)) {
                                         var globalPos = mapToItem(categoryListView, mouseX, mouseY)                   
-                                        var targetIndex = categoryListView.indexAt(10, globalPos.y + categoryListView.contentY) // x=10 as safety for list width
+                                        var targetIndex = categoryListView.indexAt(10, globalPos.y + categoryListView.contentY)
                                         if (targetIndex !== -1 && targetIndex !== index) {
                                             categoryModel.move(index, targetIndex, 1)
                                             fullRoot.draggedCategoryIndex = targetIndex
@@ -1733,6 +1725,8 @@ Item {
                     property string resultUrlAlternative: ""
                     property string _actualSource: ""
                     property string currentValidUrl: ""
+                    property var candidatesList: []
+                    property int currentCandidateIndex: 0
 
                     onResultUrlChanged: _actualSource = resultUrl
 
@@ -1782,30 +1776,49 @@ Item {
                             let combo = findCombo(cp1, cp2) || findCombo(cp2, cp1);
                             
                             if (combo) {
-                                // Folder: strip FE0F variation selectors for the folder path.
-                                // Filename: use the full codepoint string.
-                                let stripFE0F = (s) => s.replace(/-fe0f/g, "");
                                 let toUrl = (cp) => "u" + cp.replace(/-/g, "-u");
+                                let stripFE0F = (s) => s.replace(/-fe0f/g, "");
                                 
-                                let folder1 = toUrl(stripFE0F(combo.b));
-                                let filename1 = toUrl(combo.b) + "_" + toUrl(combo.p);
-                                
-                                // Reverse variation (some combos are indexed as Base+Partner but server stores Partner+Base)
-                                let folder2 = toUrl(stripFE0F(combo.p));
-                                let filename2 = toUrl(combo.p) + "_" + toUrl(combo.b);
+                                let b_unstripped = combo.b;
+                                let b_stripped = stripFE0F(combo.b);
+                                let p_unstripped = combo.p;
+                                let p_stripped = stripFE0F(combo.p);
                                 
                                 let baseUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + combo.entry.d + "/";
-                                resultUrl = baseUrl + folder1 + "/" + filename1 + ".png";
-                                resultUrlAlternative = baseUrl + folder2 + "/" + filename2 + ".png";
                                 
-                                console.log("DEBUG: Generated Primary URL", resultUrl);
-                                console.log("DEBUG: Generated Alt URL", resultUrlAlternative);
+                                let candidates = [];
+                                
+                                // Base is folder (unstripped first, then stripped)
+                                candidates.push(baseUrl + toUrl(b_unstripped) + "/" + toUrl(combo.b) + "_" + toUrl(combo.p) + ".png");
+                                if (b_stripped !== b_unstripped) {
+                                    candidates.push(baseUrl + toUrl(b_stripped) + "/" + toUrl(combo.b) + "_" + toUrl(combo.p) + ".png");
+                                }
+                                
+                                // Partner is folder (unstripped first, then stripped)
+                                candidates.push(baseUrl + toUrl(p_unstripped) + "/" + toUrl(combo.p) + "_" + toUrl(combo.b) + ".png");
+                                if (p_stripped !== p_unstripped) {
+                                    candidates.push(baseUrl + toUrl(p_stripped) + "/" + toUrl(combo.p) + "_" + toUrl(combo.b) + ".png");
+                                }
+                                
+                                candidatesList = candidates;
+                                currentCandidateIndex = 0;
+                                resultUrl = candidates[0];
+                                _actualSource = candidates[0];
+                                
+                                console.log("DEBUG: Candidates list generated:", JSON.stringify(candidates));
                             } else {
+                                candidatesList = [];
+                                currentCandidateIndex = 0;
                                 resultUrl = "";
-                                resultUrlAlternative = "";
+                                _actualSource = "";
+                                currentValidUrl = "";
                             }
                         } else {
+                            candidatesList = [];
+                            currentCandidateIndex = 0;
                             resultUrl = "";
+                            _actualSource = "";
+                            currentValidUrl = "";
                         }
                     }
                     onEmoji1Changed: updateResult()
@@ -1877,9 +1890,10 @@ Item {
                     }
                     
                     function copyResult() {
-                        if (resultUrl !== "") {
-                            let cmd = 'curl -sL "' + resultUrl + '" > /tmp/kmoji_copy.png && (wl-copy --type image/png < /tmp/kmoji_copy.png || xclip -selection clipboard -t image/png -i /tmp/kmoji_copy.png)'
+                        if (currentValidUrl !== "") {
+                            let cmd = 'curl -sL "' + currentValidUrl + '" > /tmp/kmoji_copy.png && (wl-copy --type image/png < /tmp/kmoji_copy.png || xclip -selection clipboard -t image/png -i /tmp/kmoji_copy.png)'
                             shellSource.connectSource(cmd)
+                            showPasteTemporaryMessage(i18n("Copied mashup to clipboard!"))
                         }
                     }
 
@@ -1899,7 +1913,6 @@ Item {
                                 Layout.fillWidth: true
                             }
 
-                            // Slot 1 Stack
                             ColumnLayout {
                                 spacing: 8
                                 Layout.alignment: Qt.AlignVCenter
@@ -1958,7 +1971,6 @@ Item {
                                 }
                             }
 
-                            // Plus Sign Column
                             ColumnLayout {
                                 spacing: 8
                                 Layout.alignment: Qt.AlignVCenter
@@ -1975,7 +1987,6 @@ Item {
                                 }
                             }
 
-                            // Slot 2 Stack
                             ColumnLayout {
                                 spacing: 8
                                 Layout.alignment: Qt.AlignVCenter
@@ -2034,7 +2045,6 @@ Item {
                                 }
                             }
 
-                            // Equals Sign Column
                             ColumnLayout {
                                 spacing: 8
                                 Layout.alignment: Qt.AlignVCenter
@@ -2051,7 +2061,6 @@ Item {
                                 }
                             }
 
-                            // Result Stack
                             ColumnLayout {
                                 spacing: 8
                                 Layout.alignment: Qt.AlignVCenter
@@ -2099,8 +2108,13 @@ Item {
                                         onStatusChanged: {
                                             if (status === Image.Ready) {
                                                 kitchenView.currentValidUrl = source.toString()
-                                            } else if (status === Image.Error && source.toString() === kitchenView.resultUrl && kitchenView.resultUrlAlternative !== "") {
-                                                 kitchenView._actualSource = kitchenView.resultUrlAlternative
+                                            } else if (status === Image.Error) {
+                                                if (kitchenView.currentCandidateIndex + 1 < kitchenView.candidatesList.length) {
+                                                    kitchenView.currentCandidateIndex += 1
+                                                    kitchenView._actualSource = kitchenView.candidatesList[kitchenView.currentCandidateIndex]
+                                                } else {
+                                                    kitchenView.currentValidUrl = ""
+                                                }
                                             }
                                         }
                                     }
@@ -2763,7 +2777,6 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         text: fullRoot.emojiHoveredEmojiKey
-                        // Scale up Noto Color Emoji to compensate for its built-in padding
                         font.pixelSize: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? Math.floor((previewBar.height - 20) * 1.18) : (previewBar.height - 20)
                         font.family: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? "Noto Color Emoji" : undefined
                         visible: fullRoot.emojiHoveredEmojiKey !== ""
