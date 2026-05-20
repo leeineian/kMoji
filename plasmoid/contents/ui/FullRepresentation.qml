@@ -12,6 +12,7 @@ import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.components 3.0 as PC3
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.plasma5support as Plasma5Support
 
 import "../assets/emoji-list.js" as EmojiList
 import "../assets/kitchen-metadata.js" as KitchenMetadata
@@ -1734,6 +1735,15 @@ Item {
                     property string currentValidUrl: ""
 
                     onResultUrlChanged: _actualSource = resultUrl
+
+                    Plasma5Support.DataSource {
+                        id: shellSource
+                        engine: "executable"
+                        connectedSources: []
+                        onNewData: (source, data) => {
+                            disconnectSource(source)
+                        }
+                    }
 
                     readonly property int slotSize: {
                         let calculated = Math.floor((kitchenView.width - 144) / 3)
