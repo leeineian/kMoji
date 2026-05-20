@@ -1819,6 +1819,52 @@ Item {
                             }
                         }
                     }
+
+                    function randomizeSlot1() {
+                        let bases = Object.keys(KitchenMetadata.kitchenMetadata);
+                        if (bases.length === 0) return;
+                        if (emoji2 !== "") {
+                            let cp2 = getCodepoint(emoji2).replace(/-fe0f/g, "");
+                            let validBases = [];
+                            for (let cp1 of bases) {
+                                let partners = KitchenMetadata.kitchenMetadata[cp1];
+                                if (partners) {
+                                    for (let p of partners) {
+                                        if (p.e.replace(/-fe0f/g, "") === cp2) {
+                                            validBases.push(cp1);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            if (validBases.length > 0) {
+                                let chosenCp = validBases[Math.floor(Math.random() * validBases.length)];
+                                emoji1 = emojiFromCodepoint(chosenCp);
+                                return;
+                            }
+                        }
+                        let chosenCp = bases[Math.floor(Math.random() * bases.length)];
+                        emoji1 = emojiFromCodepoint(chosenCp);
+                    }
+
+                    function randomizeSlot2() {
+                        let bases = Object.keys(KitchenMetadata.kitchenMetadata);
+                        if (bases.length === 0) return;
+                        if (emoji1 !== "") {
+                            let cp1_raw = getCodepoint(emoji1);
+                            let cp1 = bases.find(k => k.replace(/-fe0f/g, "") === cp1_raw.replace(/-fe0f/g, ""));
+                            if (cp1) {
+                                let partners = KitchenMetadata.kitchenMetadata[cp1];
+                                if (partners && partners.length > 0) {
+                                    let chosenPartner = partners[Math.floor(Math.random() * partners.length)];
+                                    emoji2 = emojiFromCodepoint(chosenPartner.e);
+                                    return;
+                                }
+                            }
+                        }
+                        let chosenCp = bases[Math.floor(Math.random() * bases.length)];
+                        emoji2 = emojiFromCodepoint(chosenCp);
+                    }
                     
                     function copyResult() {
                         if (resultUrl !== "") {
@@ -1843,239 +1889,246 @@ Item {
                                 Layout.fillWidth: true
                             }
 
-                            // Slot 1
-                            Rectangle {
-                                id: slot1
-                                width: kitchenView.slotSize
-                                height: kitchenView.slotSize
-                                Layout.preferredWidth: kitchenView.slotSize
-                                Layout.preferredHeight: kitchenView.slotSize
-                                color: Kirigami.Theme.backgroundColor
-                                border.color: (activeFocus || kitchenView.emoji1 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                                border.width: (activeFocus || kitchenView.emoji1 === "") ? 2 : 1
-                                radius: 8
-                                
-                                focusPolicy: Qt.StrongFocus
-                                activeFocusOnTab: true
-                                KeyNavigation.tab: slot2
-                                KeyNavigation.backtab: (categoryListView.currentItem || sidebarToggleButton)
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: kitchenView.emoji1 === "" ? "?" : kitchenView.emoji1
-                                    font.pixelSize: kitchenView.emoji1 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
-                                    font.family: kitchenView.emoji1 === "" ? "" : "Noto Color Emoji"
-                                    color: Kirigami.Theme.textColor
-                                    opacity: kitchenView.emoji1 === "" ? 0.2 : 1.0
-                                    renderType: kitchenView.emoji1 === "" ? Text.QtRendering : Text.NativeRendering
-                                }
-                                
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        slot1.forceActiveFocus()
-                                        kitchenView.emoji1 = ""
-                                    }
-                                }
-
-                                Keys.onReturnPressed: kitchenView.emoji1 = ""
-                                Keys.onEnterPressed: kitchenView.emoji1 = ""
-                            }
-
-                            Text {
-                                text: "+"
-                                font.pixelSize: 24
-                                color: Kirigami.Theme.textColor
-                                opacity: 0.6
+                            // Slot 1 Stack
+                            ColumnLayout {
+                                spacing: 8
                                 Layout.alignment: Qt.AlignVCenter
-                            }
 
-                            // Slot 2
-                            Rectangle {
-                                id: slot2
-                                width: kitchenView.slotSize
-                                height: kitchenView.slotSize
-                                Layout.preferredWidth: kitchenView.slotSize
-                                Layout.preferredHeight: kitchenView.slotSize
-                                color: Kirigami.Theme.backgroundColor
-                                border.color: (activeFocus || kitchenView.emoji2 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                                border.width: (activeFocus || kitchenView.emoji2 === "") ? 2 : 1
-                                radius: 8
-                                
-                                focusPolicy: Qt.StrongFocus
-                                activeFocusOnTab: true
-                                KeyNavigation.tab: resultSlot
-                                KeyNavigation.backtab: slot1
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: kitchenView.emoji2 === "" ? "?" : kitchenView.emoji2
-                                    font.pixelSize: kitchenView.emoji2 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
-                                    font.family: kitchenView.emoji2 === "" ? "" : "Noto Color Emoji"
-                                    color: Kirigami.Theme.textColor
-                                    opacity: kitchenView.emoji2 === "" ? 0.2 : 1.0
-                                    renderType: kitchenView.emoji2 === "" ? Text.QtRendering : Text.NativeRendering
-                                }
-                                
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        slot2.forceActiveFocus()
-                                        kitchenView.emoji2 = ""
-                                    }
-                                }
-
-                                Keys.onReturnPressed: kitchenView.emoji2 = ""
-                                Keys.onEnterPressed: kitchenView.emoji2 = ""
-                            }
-
-                            Text {
-                                text: "="
-                                font.pixelSize: 24
-                                color: Kirigami.Theme.textColor
-                                opacity: 0.6
-                                Layout.alignment: Qt.AlignVCenter
-                            }
-
-                            // Result
-                            Rectangle {
-                                id: resultSlot
-                                width: kitchenView.slotSize
-                                height: kitchenView.slotSize
-                                Layout.preferredWidth: kitchenView.slotSize
-                                Layout.preferredHeight: kitchenView.slotSize
-                                color: Kirigami.Theme.backgroundColor
-                                border.color: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                                border.width: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl === "") ? 2 : 1
-                                radius: 8
-                                
-                                focusPolicy: Qt.StrongFocus
-                                activeFocusOnTab: true
-                                KeyNavigation.tab: swapButton
-                                KeyNavigation.backtab: slot2
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "?"
-                                    font.pixelSize: Math.floor(kitchenView.slotSize * 0.6)
-                                    color: Kirigami.Theme.textColor
-                                    opacity: 0.2
-                                }
-
-                                Image {
-                                    id: resultImage
-                                    anchors.fill: parent
-                                    anchors.margins: 8
-                                    source: kitchenView._actualSource
-                                    sourceSize: Qt.size(512, 512)
-                                    fillMode: Image.PreserveAspectFit
-                                    opacity: (status === Image.Ready && kitchenView.resultUrl !== "") ? 1.0 : 0.0
-                                    smooth: true
-                                    mipmap: true
-                                    asynchronous: true
+                                Rectangle {
+                                    id: slot1
+                                    width: kitchenView.slotSize
+                                    height: kitchenView.slotSize
+                                    Layout.preferredWidth: kitchenView.slotSize
+                                    Layout.preferredHeight: kitchenView.slotSize
+                                    color: Kirigami.Theme.backgroundColor
+                                    border.color: (activeFocus || kitchenView.emoji1 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                    border.width: (activeFocus || kitchenView.emoji1 === "") ? 2 : 1
+                                    radius: 8
                                     
-                                    Behavior on opacity {
-                                        NumberAnimation { duration: 150 }
+                                    focusPolicy: Qt.StrongFocus
+                                    activeFocusOnTab: true
+                                    KeyNavigation.tab: randomizeSlot1Button
+                                    KeyNavigation.backtab: (categoryListView.currentItem || sidebarToggleButton)
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: kitchenView.emoji1 === "" ? "?" : kitchenView.emoji1
+                                        font.pixelSize: kitchenView.emoji1 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
+                                        font.family: kitchenView.emoji1 === "" ? "" : "Noto Color Emoji"
+                                        color: Kirigami.Theme.textColor
+                                        opacity: kitchenView.emoji1 === "" ? 0.2 : 1.0
+                                        renderType: kitchenView.emoji1 === "" ? Text.QtRendering : Text.NativeRendering
                                     }
                                     
-                                    onStatusChanged: {
-                                        if (status === Image.Ready) {
-                                            kitchenView.currentValidUrl = source.toString()
-                                        } else if (status === Image.Error && source.toString() === kitchenView.resultUrl && kitchenView.resultUrlAlternative !== "") {
-                                             kitchenView._actualSource = kitchenView.resultUrlAlternative
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            slot1.forceActiveFocus()
+                                            kitchenView.emoji1 = ""
                                         }
                                     }
-                                }
-                                
-                                MouseArea {
-                                    id: resultSlotArea
-                                    anchors.fill: parent
-                                    enabled: kitchenView.currentValidUrl !== ""
-                                    hoverEnabled: true
-                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                    onClicked: {
-                                        resultSlot.forceActiveFocus()
-                                        kitchenView.copyResult()
-                                    }
+
+                                    Keys.onReturnPressed: kitchenView.emoji1 = ""
+                                    Keys.onEnterPressed: kitchenView.emoji1 = ""
                                 }
 
-                                Keys.onReturnPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
-                                Keys.onEnterPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
+                                PlasmaComponents.ToolButton {
+                                    id: randomizeSlot1Button
+                                    display: PlasmaComponents.ToolButton.IconOnly
+                                    icon.name: "roll-symbolic"
+                                    Layout.alignment: Qt.AlignHCenter
+                                    activeFocusOnTab: true
+                                    KeyNavigation.tab: slot2
+                                    KeyNavigation.backtab: slot1
+                                    onClicked: kitchenView.randomizeSlot1()
+                                    PlasmaComponents.ToolTip { text: i18n("Randomize Slot 1") }
+                                }
+                            }
+
+                            // Plus Sign Column
+                            ColumnLayout {
+                                spacing: 8
+                                Layout.alignment: Qt.AlignVCenter
+                                Text {
+                                    text: "+"
+                                    font.pixelSize: 24
+                                    color: Kirigami.Theme.textColor
+                                    opacity: 0.6
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                                Item {
+                                    Layout.preferredHeight: 32
+                                    Layout.preferredWidth: 1
+                                }
+                            }
+
+                            // Slot 2 Stack
+                            ColumnLayout {
+                                spacing: 8
+                                Layout.alignment: Qt.AlignVCenter
+
+                                Rectangle {
+                                    id: slot2
+                                    width: kitchenView.slotSize
+                                    height: kitchenView.slotSize
+                                    Layout.preferredWidth: kitchenView.slotSize
+                                    Layout.preferredHeight: kitchenView.slotSize
+                                    color: Kirigami.Theme.backgroundColor
+                                    border.color: (activeFocus || kitchenView.emoji2 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                    border.width: (activeFocus || kitchenView.emoji2 === "") ? 2 : 1
+                                    radius: 8
+                                    
+                                    focusPolicy: Qt.StrongFocus
+                                    activeFocusOnTab: true
+                                    KeyNavigation.tab: randomizeSlot2Button
+                                    KeyNavigation.backtab: randomizeSlot1Button
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: kitchenView.emoji2 === "" ? "?" : kitchenView.emoji2
+                                        font.pixelSize: kitchenView.emoji2 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
+                                        font.family: kitchenView.emoji2 === "" ? "" : "Noto Color Emoji"
+                                        color: Kirigami.Theme.textColor
+                                        opacity: kitchenView.emoji2 === "" ? 0.2 : 1.0
+                                        renderType: kitchenView.emoji2 === "" ? Text.QtRendering : Text.NativeRendering
+                                    }
+                                    
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            slot2.forceActiveFocus()
+                                            kitchenView.emoji2 = ""
+                                        }
+                                    }
+
+                                    Keys.onReturnPressed: kitchenView.emoji2 = ""
+                                    Keys.onEnterPressed: kitchenView.emoji2 = ""
+                                }
+
+                                PlasmaComponents.ToolButton {
+                                    id: randomizeSlot2Button
+                                    display: PlasmaComponents.ToolButton.IconOnly
+                                    icon.name: "roll-symbolic"
+                                    Layout.alignment: Qt.AlignHCenter
+                                    activeFocusOnTab: true
+                                    KeyNavigation.tab: resultSlot
+                                    KeyNavigation.backtab: slot2
+                                    onClicked: kitchenView.randomizeSlot2()
+                                    PlasmaComponents.ToolTip { text: i18n("Randomize Slot 2") }
+                                }
+                            }
+
+                            // Equals Sign Column
+                            ColumnLayout {
+                                spacing: 8
+                                Layout.alignment: Qt.AlignVCenter
+                                Text {
+                                    text: "="
+                                    font.pixelSize: 24
+                                    color: Kirigami.Theme.textColor
+                                    opacity: 0.6
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                                Item {
+                                    Layout.preferredHeight: 32
+                                    Layout.preferredWidth: 1
+                                }
+                            }
+
+                            // Result Stack
+                            ColumnLayout {
+                                spacing: 8
+                                Layout.alignment: Qt.AlignVCenter
+
+                                Rectangle {
+                                    id: resultSlot
+                                    width: kitchenView.slotSize
+                                    height: kitchenView.slotSize
+                                    Layout.preferredWidth: kitchenView.slotSize
+                                    Layout.preferredHeight: kitchenView.slotSize
+                                    color: Kirigami.Theme.backgroundColor
+                                    border.color: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                    border.width: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl === "") ? 2 : 1
+                                    radius: 8
+                                    
+                                    focusPolicy: Qt.StrongFocus
+                                    activeFocusOnTab: true
+                                    KeyNavigation.tab: randomizeResultButton
+                                    KeyNavigation.backtab: randomizeSlot2Button
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "?"
+                                        font.pixelSize: Math.floor(kitchenView.slotSize * 0.6)
+                                        color: Kirigami.Theme.textColor
+                                        opacity: 0.2
+                                    }
+
+                                    Image {
+                                        id: resultImage
+                                        anchors.fill: parent
+                                        anchors.margins: 8
+                                        source: kitchenView._actualSource
+                                        sourceSize: Qt.size(512, 512)
+                                        fillMode: Image.PreserveAspectFit
+                                        opacity: (status === Image.Ready && kitchenView.resultUrl !== "") ? 1.0 : 0.0
+                                        smooth: true
+                                        mipmap: true
+                                        asynchronous: true
+                                        
+                                        Behavior on opacity {
+                                            NumberAnimation { duration: 150 }
+                                        }
+                                        
+                                        onStatusChanged: {
+                                            if (status === Image.Ready) {
+                                                kitchenView.currentValidUrl = source.toString()
+                                            } else if (status === Image.Error && source.toString() === kitchenView.resultUrl && kitchenView.resultUrlAlternative !== "") {
+                                                 kitchenView._actualSource = kitchenView.resultUrlAlternative
+                                            }
+                                        }
+                                    }
+                                    
+                                    MouseArea {
+                                        id: resultSlotArea
+                                        anchors.fill: parent
+                                        enabled: kitchenView.currentValidUrl !== ""
+                                        hoverEnabled: true
+                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        onClicked: {
+                                            resultSlot.forceActiveFocus()
+                                            kitchenView.copyResult()
+                                        }
+                                    }
+
+                                    Keys.onReturnPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
+                                    Keys.onEnterPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
+                                }
+
+                                PlasmaComponents.ToolButton {
+                                    id: randomizeResultButton
+                                    display: PlasmaComponents.ToolButton.IconOnly
+                                    icon.name: "roll-symbolic"
+                                    Layout.alignment: Qt.AlignHCenter
+                                    activeFocusOnTab: true
+                                    KeyNavigation.tab: kitchenGridView
+                                    KeyNavigation.backtab: resultSlot
+                                    onClicked: kitchenView.randomize()
+                                    PlasmaComponents.ToolTip { text: i18n("Randomize Result") }
+                                }
                             }
 
                             Item {
                                 Layout.fillWidth: true
                             }
                         }
-                        
-                        // --- Action Buttons ---
-                        RowLayout {
-                            id: actionButtonsRow
-                            anchors.top: selectionRow.bottom
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            anchors.topMargin: 16
-                            anchors.bottomMargin: 8
-                            spacing: 8
-                            
-                            PlasmaComponents.ToolButton {
-                                id: swapButton
-                                display: PlasmaComponents.ToolButton.IconOnly
-                                icon.name: "view-refresh-symbolic"
-                                activeFocusOnTab: true
-                                KeyNavigation.tab: randomizeButton
-                                KeyNavigation.backtab: resultSlot
-                                onClicked: {
-                                    let temp = kitchenView.emoji1;
-                                    kitchenView.emoji1 = kitchenView.emoji2;
-                                    kitchenView.emoji2 = temp;
-                                }
-                                PlasmaComponents.ToolTip { text: i18n("Swap Emojis") }
-                            }
-
-                            PlasmaComponents.ToolButton {
-                                id: randomizeButton
-                                display: PlasmaComponents.ToolButton.IconOnly
-                                icon.name: "roll-symbolic"
-                                activeFocusOnTab: true
-                                KeyNavigation.tab: clearButton
-                                KeyNavigation.backtab: swapButton
-                                onClicked: kitchenView.randomize()
-                                PlasmaComponents.ToolTip { text: i18n("Randomize") }
-                            }
-
-                            PlasmaComponents.ToolButton {
-                                id: clearButton
-                                display: PlasmaComponents.ToolButton.IconOnly
-                                icon.name: "edit-clear-all"
-                                activeFocusOnTab: true
-                                KeyNavigation.tab: copyButton
-                                KeyNavigation.backtab: randomizeButton
-                                onClicked: {
-                                    kitchenView.emoji1 = ""
-                                    kitchenView.emoji2 = ""
-                                }
-                                PlasmaComponents.ToolTip { text: i18n("Clear All") }
-                            }
-
-                            PlasmaComponents.ToolButton {
-                                id: copyButton
-                                display: PlasmaComponents.ToolButton.IconOnly
-                                icon.name: "edit-copy"
-                                activeFocusOnTab: true
-                                KeyNavigation.tab: kitchenGridView
-                                KeyNavigation.backtab: clearButton
-                                enabled: kitchenView.currentValidUrl !== ""
-                                onClicked: kitchenView.copyResult()
-                                PlasmaComponents.ToolTip { text: i18n("Copy Result") }
-                            }
-                        }
 
                         // --- Grid Area ---
                         Kirigami.Separator {
                             id: gridSeparator
-                            anchors.top: actionButtonsRow.bottom
+                            anchors.top: selectionRow.bottom
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.topMargin: 8
@@ -2095,7 +2148,7 @@ Item {
                             
                             activeFocusOnTab: true
                             KeyNavigation.tab: searchField
-                            KeyNavigation.backtab: copyButton
+                            KeyNavigation.backtab: randomizeResultButton
 
                             keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
                             keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
@@ -2146,11 +2199,7 @@ Item {
                                         searchField.forceActiveFocus()
                                         event.accepted = true
                                     } else {
-                                        if (copyButton.enabled) {
-                                            copyButton.forceActiveFocus()
-                                        } else {
-                                            clearButton.forceActiveFocus()
-                                        }
+                                        randomizeResultButton.forceActiveFocus()
                                         event.accepted = true
                                     }
                                 }
