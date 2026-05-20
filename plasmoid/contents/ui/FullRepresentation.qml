@@ -1737,7 +1737,7 @@ Item {
 
                     readonly property int slotSize: {
                         let calculated = Math.floor((kitchenView.width - 144) / 3)
-                        return Math.min(160, Math.max(48, calculated))
+                        return Math.min(160, Math.max(32, calculated))
                     }
 
                     function getCodepoint(emoji) {
@@ -1827,18 +1827,17 @@ Item {
                         }
                     }
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        spacing: 0
-
                         // --- Selection and Result Area ---
                         RowLayout {
-                            Layout.fillWidth: true
-                            Layout.topMargin: 16
-                            Layout.leftMargin: 16
-                            Layout.rightMargin: 16
-                            Layout.alignment: Qt.AlignHCenter
+                            id: selectionRow
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.topMargin: 16
+                            anchors.leftMargin: 16
+                            anchors.rightMargin: 16
                             spacing: 16
+                            clip: true
 
                             Item {
                                 Layout.fillWidth: true
@@ -2013,11 +2012,11 @@ Item {
                         
                         // --- Action Buttons ---
                         RowLayout {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.topMargin: 16
-                            Layout.bottomMargin: 8
-                            Layout.leftMargin: 16
-                            Layout.rightMargin: 16
+                            id: actionButtonsRow
+                            anchors.top: selectionRow.bottom
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.topMargin: 16
+                            anchors.bottomMargin: 8
                             spacing: 8
                             
                             PlasmaComponents.ToolButton {
@@ -2075,16 +2074,22 @@ Item {
 
                         // --- Grid Area ---
                         Kirigami.Separator {
-                            Layout.fillWidth: true
-                            Layout.topMargin: 8
+                            id: gridSeparator
+                            anchors.top: actionButtonsRow.bottom
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.topMargin: 8
                         }
 
                         GridView {
                             id: kitchenGridView
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
+                            anchors.top: gridSeparator.bottom
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
                             cellWidth: fullRoot.internalGridSize
                             cellHeight: fullRoot.internalGridSize
+                            rightMargin: ScrollBar.vertical.visible ? ScrollBar.vertical.width : 0
                             clip: true
                             model: fullRoot.filteredEmojis
                             
@@ -2120,7 +2125,7 @@ Item {
                                 Text {
                                     anchors.centerIn: parent
                                     text: modelData.emoji
-                                    font.pixelSize: Math.floor(fullRoot.internalGridSize * 0.7)
+                                    font.pixelSize: Math.floor(fullRoot.internalGridSize * 0.81)
                                     font.family: "Noto Color Emoji"
                                     renderType: Text.NativeRendering
                                 }
@@ -2129,6 +2134,7 @@ Item {
                                     id: mouseArea
                                     anchors.fill: parent
                                     hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                                     onEntered: {
                                         fullRoot.emojiHoveredEmojiKey = modelData.emoji
                                         fullRoot.hoveredEmojiName = modelData.name
@@ -2140,17 +2146,16 @@ Item {
                                         fullRoot.emojiHoveredEmojiKey = ""
                                         fullRoot.hoveredEmojiName = ""
                                     }
-                                    onClicked: {
-                                        if (kitchenView.emoji1 === "") {
+                                    onClicked: function(mouse) {
+                                        if (mouse.button === Qt.LeftButton) {
                                             kitchenView.emoji1 = modelData.emoji
-                                        } else {
+                                        } else if (mouse.button === Qt.RightButton) {
                                             kitchenView.emoji2 = modelData.emoji
                                         }
                                     }
                                 }
                             }
                         }
-                    }
                 }
 
                 RowLayout {
@@ -2576,7 +2581,8 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         text: fullRoot.emojiHoveredEmojiKey
-                        font.pixelSize: previewBar.height - 20
+                        // Scale up Noto Color Emoji to compensate for its built-in padding
+                        font.pixelSize: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? Math.floor((previewBar.height - 20) * 1.18) : (previewBar.height - 20)
                         font.family: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? "Noto Color Emoji" : undefined
                         visible: fullRoot.emojiHoveredEmojiKey !== ""
                         color: Kirigami.Theme.textColor
