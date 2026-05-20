@@ -38,7 +38,7 @@ Item {
     // Search & Feedback
     property string hoveredEmojiName: ""
     property int keyboardPressedIndex: -1
-    property string defaultPastePlaceholder: i18n("Paste emojis…")
+    property string defaultPastePlaceholder: fullRoot.selectedCategory === fullRoot.catGifs ? i18n("Paste links…") : i18n("Paste emojis…")
     property string searchPlaceholderText: i18n("Search emojis…")
     property bool searchPlaceholderMessageActive: false
 
@@ -110,7 +110,7 @@ Item {
     // Default Categories
     property var defaultCategoryOrder: [
         { name: catEmojiKitchen, displayName: i18n("Emoji Kitchen"), icon: "path-union-symbolic" },
-        { name: catGifs,         displayName: i18n("GIFs (Klipy)"),   icon: "image-gif" },
+        { name: catGifs,         displayName: i18n("GIFs"),   icon: "fileview-preview-symbolic" },
         { name: catAll,       displayName: i18n("All"),       icon: "view-list-icons" },
         { name: catFavorites, displayName: i18n("Favorites"), icon: "bookmarks-bookmarked" },
         { name: catRecent,    displayName: i18n("Recent"),    icon: "chronometer" },
@@ -853,14 +853,14 @@ Item {
                     }
                     if (parsed[k].name === catGifs) {
                         hasGifs = true
-                        parsed[k].icon = "image-gif"
+                        parsed[k].icon = "fileview-preview-symbolic"
                     }
                 }
                 if (!hasKitchen) {
                     parsed.unshift({ name: catEmojiKitchen, icon: "path-union-symbolic" })
                 }
                 if (!hasGifs) {
-                    parsed.splice(hasKitchen ? 1 : 0, 0, { name: catGifs, icon: "image-gif" })
+                    parsed.splice(hasKitchen ? 1 : 0, 0, { name: catGifs, icon: "fileview-preview-symbolic" })
                 }
 
                 categoryModel.clear()
@@ -2394,6 +2394,10 @@ Item {
                     visible: fullRoot.selectedCategory === fullRoot.catGifs
 
                     property bool isLoading: false
+                    property bool isLoadingMore: false
+                    property int currentPage: 1
+                    property bool hasNextPage: false
+                    property string lastQuery: ""
 
                     ListModel { id: gifCol0Model }
                     ListModel { id: gifCol1Model }
@@ -2430,7 +2434,7 @@ Item {
 
                     onVisibleChanged: {
                         if (visible) {
-                            gifView.fetchGifs(fullRoot.filter)
+                            gifView.fetchGifs(fullRoot.filter, false)
                         } else {
                             fullRoot.hoveredGifTitle = ""
                             fullRoot.hoveredGifUrl = ""
@@ -2452,7 +2456,7 @@ Item {
                         repeat: false
                         running: false
                         onTriggered: {
-                            gifView.fetchGifs(fullRoot.filter)
+                            gifView.fetchGifs(fullRoot.filter, false)
                         }
                     }
 
@@ -2494,13 +2498,58 @@ Item {
                         gifCol2Height = colHeights[2]
                     }
 
-                    function fetchGifs(query) {
-                        gifView.isLoading = true
+                    function appendToColumns(newItems) {
+                        var numCols = masonryRow.numColumns
+                        var colWidth = masonryRow.columnWidth
+                        var space = masonryRow.spacing
+                        var colHeights = [gifCol0Height, gifCol1Height, gifCol2Height]
+
+                        for (var i = 0; i < newItems.length; i++) {
+                            var item = newItems[i]
+
+                            var minCol = 0
+                            var minHeight = colHeights[0]
+                            for (var c = 1; c < numCols; c++) {
+                                if (colHeights[c] < minHeight) {
+                                    minHeight = colHeights[c]
+                                    minCol = c
+                                }
+                            }
+
+                            colModels[minCol].append({
+                                title: item.title,
+                                rawUrl: item.rawUrl,
+                                previewUrl: item.previewUrl,
+                                aspectRatio: item.aspectRatio
+                            })
+
+                            var cardHeight = Math.floor(colWidth / item.aspectRatio)
+                            colHeights[minCol] += cardHeight + space
+                        }
+
+                        gifCol0Height = colHeights[0]
+                        gifCol1Height = colHeights[1]
+                        gifCol2Height = colHeights[2]
+                    }
+
+                    function fetchGifs(query, append) {
+                        if (!append) {
+                            gifView.currentPage = 1
+                            gifView.hasNextPage = false
+                            gifView.lastQuery = query || ""
+                            gifView.isLoading = true
+                        } else {
+                            gifView.isLoadingMore = true
+                        }
+
                         var apiKey = (plasmoid.configuration.KlipyApiKey || "c9d81d227b0b4b2fb4e0bd6f6e52003c").trim()
-                        var url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/search?q=" + encodeURIComponent(query) + "&per_page=24"
+                        var page = append ? gifView.currentPage : 1
+                        var url
 
                         if (!query || query.trim() === "") {
-                            url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/trending?per_page=24"
+                            url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/trending?per_page=24&page=" + page
+                        } else {
+                            url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/search?q=" + encodeURIComponent(query) + "&per_page=24&page=" + page
                         }
 
                         var xhr = new XMLHttpRequest()
@@ -2508,6 +2557,7 @@ Item {
                         xhr.onreadystatechange = function() {
                             if (xhr.readyState === XMLHttpRequest.DONE) {
                                 gifView.isLoading = false
+                                gifView.isLoadingMore = false
                                 if (xhr.status === 200) {
                                     var response = JSON.parse(xhr.responseText)
                                     if (response.result && response.data && response.data.data) {
@@ -2533,8 +2583,17 @@ Item {
                                                 })
                                             }
                                         }
-                                        rawGifsList = parsed
-                                        redistributeGifs()
+
+                                        if (append) {
+                                            rawGifsList = rawGifsList.concat(parsed)
+                                            appendToColumns(parsed)
+                                        } else {
+                                            rawGifsList = parsed
+                                            redistributeGifs()
+                                        }
+
+                                        gifView.hasNextPage = response.data.has_next === true
+                                        gifView.currentPage = (response.data.current_page || page) + 1
                                     }
                                 } else {
                                     console.log("ERROR: Klipy API returned status: " + xhr.status)
@@ -2544,29 +2603,16 @@ Item {
                         xhr.send()
                     }
 
+                    function fetchMoreGifs() {
+                        if (gifView.isLoadingMore || gifView.isLoading || !gifView.hasNextPage) return
+                        gifView.fetchGifs(gifView.lastQuery, true)
+                    }
+
                     function copyGif(gifUrl, title) {
                         if (!gifUrl) return;
 
-                        var copyAction = plasmoid.configuration.KlipyCopyAction
-                        var cmd = ""
-                        var tmpFile = "/tmp/kmoji_" + Date.now() + ".gif"
-
-                        var downloadCmd = 'curl -sL "' + gifUrl + '" > ' + tmpFile
-                        var wlCopyFile = 'wl-copy --type image/gif < ' + tmpFile
-                        var xclipFile = 'xclip -selection clipboard -t image/gif -i ' + tmpFile
-                        var wlCopyText = 'wl-copy "' + gifUrl + '"'
-                        var xclipText = 'echo -n "' + gifUrl + '" | xclip -selection clipboard'
-
-                        if (copyAction === 0) {
-                            cmd = downloadCmd + ' && (' + wlCopyFile + ' || ' + xclipFile + ')'
-                        } else if (copyAction === 1) {
-                            cmd = wlCopyText + ' || ' + xclipText
-                        } else {
-                            cmd = downloadCmd + ' && (' + wlCopyFile + ' || ' + xclipFile + ') && (' + wlCopyText + ' || ' + xclipText + ')'
-                        }
-
-                        gifShellSource.connectSource(cmd)
-                        fullRoot.showPasteTemporaryMessage(i18n("Copied GIF to clipboard!"))
+                        clipboard.content = gifUrl
+                        fullRoot.showPasteTemporaryMessage(i18n("Copied: %1", title))
                     }
 
                     // --- Custom Busy Indicator Loader ---
@@ -2593,6 +2639,19 @@ Item {
                         PC3.ItemDelegate {
                             width: masonryRow.columnWidth
                             height: Math.floor(width / model.aspectRatio)
+
+                            onClicked: {
+                                gifView.copyGif(model.rawUrl, model.title)
+                                if (plasmoid.configuration.CloseAfterSelection) {
+                                    if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                acceptedButtons: Qt.NoButton
+                            }
 
                             background: Rectangle {
                                 anchors.fill: parent
@@ -2628,13 +2687,7 @@ Item {
                                     }
                                 }
 
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        gifView.copyGif(model.rawUrl, model.title)
-                                    }
-                                }
+
                             }
                         }
                     }
@@ -2648,11 +2701,17 @@ Item {
                         anchors.bottomMargin: 0
                         anchors.rightMargin: 0
                         contentWidth: width
-                        contentHeight: Math.max(col0.childrenRect.height, col1.childrenRect.height, col2.childrenRect.height) + 20
+                        contentHeight: Math.max(col0.childrenRect.height, col1.childrenRect.height, col2.childrenRect.height) + (gifView.isLoadingMore ? 48 : 20)
                         clip: true
                         visible: !gifView.isLoading && !gifSearchTimer.running && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0)
 
                         ScrollBar.vertical: ScrollBar {}
+
+                        onContentYChanged: {
+                            if (contentHeight > height && contentY >= contentHeight - height - 500) {
+                                gifView.fetchMoreGifs()
+                            }
+                        }
 
                         WheelHandler {
                             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -2713,6 +2772,16 @@ Item {
                                     delegate: gifDelegate
                                 }
                             }
+                        }
+
+                        // --- Loading More Indicator ---
+                        PlasmaComponents.BusyIndicator {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: Math.max(col0.childrenRect.height, col1.childrenRect.height, col2.childrenRect.height) + 12
+                            running: gifView.isLoadingMore
+                            visible: gifView.isLoadingMore
+                            width: 24
+                            height: 24
                         }
                     }
                 }
@@ -3158,7 +3227,7 @@ Item {
 
                     Kirigami.Icon {
                         anchors.centerIn: parent
-                        source: fullRoot.selectedCategory === fullRoot.catGifs ? "image-gif" : "preferences-desktop-emoticons-symbolic"
+                        source: fullRoot.selectedCategory === fullRoot.catGifs ? "fileview-preview-symbolic" : "preferences-desktop-emoticons-symbolic"
                         width: parent.height
                         height: parent.height
                         color: Kirigami.Theme.disabledTextColor
@@ -3171,7 +3240,7 @@ Item {
                     Layout.alignment: Qt.AlignVCenter
                     text: {
                         if (fullRoot.selectedCategory === fullRoot.catGifs) {
-                            return fullRoot.hoveredGifTitle !== "" ? fullRoot.hoveredGifTitle : i18n("Hover over a GIF to animate it. Click to copy!")
+                            return fullRoot.hoveredGifTitle !== "" ? fullRoot.hoveredGifTitle : i18n("Hover over a GIF to animate it...")
                         }
                         return fullRoot.emojiHoveredEmojiKey !== "" ? fullRoot.hoveredEmojiName : i18n("Hover over an emoji for details...")
                     }
