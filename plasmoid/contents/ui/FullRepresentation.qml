@@ -441,6 +441,10 @@ Item {
         if (!fullRoot.searchPlaceholderMessageActive) {
             fullRoot.resetSearchPlaceholder()
         }
+        pastePlaceholderResetTimer.stop()
+        Qt.callLater(function() {
+            if (pasteField) pasteField.placeholderText = fullRoot.defaultPastePlaceholder
+        })
     }
 
     onEmojiListChanged: {
@@ -950,7 +954,8 @@ Item {
         running: false
         repeat: false
         onTriggered: {
-            pasteField.placeholderText = fullRoot.defaultPastePlaceholder
+            var placeholder = (fullRoot.selectedCategory === fullRoot.catGifs) ? i18n("Paste links\u2026") : i18n("Paste emojis\u2026")
+            pasteField.placeholderText = placeholder
         }
     }
 
