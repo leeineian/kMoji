@@ -1901,8 +1901,8 @@ Item {
                                     Layout.preferredWidth: kitchenView.slotSize
                                     Layout.preferredHeight: kitchenView.slotSize
                                     color: Kirigami.Theme.backgroundColor
-                                    border.color: (activeFocus || kitchenView.emoji1 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                                    border.width: (activeFocus || kitchenView.emoji1 === "") ? 2 : 1
+                                    border.color: (activeFocus || slot1MouseArea.containsMouse || kitchenView.emoji1 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                    border.width: (activeFocus || slot1MouseArea.containsMouse || kitchenView.emoji1 === "") ? 2 : 1
                                     radius: 8
                                     
                                     focusPolicy: Qt.StrongFocus
@@ -1921,7 +1921,9 @@ Item {
                                     }
                                     
                                     MouseArea {
+                                        id: slot1MouseArea
                                         anchors.fill: parent
+                                        hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             slot1.forceActiveFocus()
@@ -1975,8 +1977,8 @@ Item {
                                     Layout.preferredWidth: kitchenView.slotSize
                                     Layout.preferredHeight: kitchenView.slotSize
                                     color: Kirigami.Theme.backgroundColor
-                                    border.color: (activeFocus || kitchenView.emoji2 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                                    border.width: (activeFocus || kitchenView.emoji2 === "") ? 2 : 1
+                                    border.color: (activeFocus || slot2MouseArea.containsMouse || kitchenView.emoji2 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                    border.width: (activeFocus || slot2MouseArea.containsMouse || kitchenView.emoji2 === "") ? 2 : 1
                                     radius: 8
                                     
                                     focusPolicy: Qt.StrongFocus
@@ -1995,7 +1997,9 @@ Item {
                                     }
                                     
                                     MouseArea {
+                                        id: slot2MouseArea
                                         anchors.fill: parent
+                                        hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             slot2.forceActiveFocus()
@@ -2063,7 +2067,7 @@ Item {
                                         text: "?"
                                         font.pixelSize: Math.floor(kitchenView.slotSize * 0.6)
                                         color: Kirigami.Theme.textColor
-                                        opacity: 0.2
+                                        opacity: 0.2 * (1.0 - resultImage.opacity)
                                     }
 
                                     Image {
