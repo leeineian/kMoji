@@ -2100,6 +2100,18 @@ Item {
                             keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
                             keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
 
+                            HoverHandler {
+                                id: kitchenGridHoverHandler
+                                onHoveredChanged: {
+                                    fullRoot.gridIsMouseOver = hovered
+                                    if (!hovered && fullRoot.emojiHoveredEmojiKey !== "") {
+                                        fullRoot.emojiLastHoveredEmojiKey = fullRoot.emojiHoveredEmojiKey
+                                        fullRoot.emojiHoveredEmojiKey = ""
+                                        fullRoot.hoveredEmojiName = ""
+                                    }
+                                }
+                            }
+
                             property bool keyboardActionPressed: false
 
                             Timer {
@@ -2233,8 +2245,9 @@ Item {
                                         }
                                     }
                                     onExited: {
-                                        fullRoot.emojiHoveredEmojiKey = ""
-                                        fullRoot.hoveredEmojiName = ""
+                                        if (fullRoot.emojiHoveredEmojiKey === modelData.emoji) {
+                                            fullRoot.emojiLastHoveredEmojiKey = modelData.emoji
+                                        }
                                     }
                                     onClicked: function(mouse) {
                                         if (mouse.button === Qt.LeftButton) {
