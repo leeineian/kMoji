@@ -1,44 +1,50 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# update_emoji.sh
+# emoji_metadata.sh
 #
 # Description:
-#   Downloads the latest emoji-test.txt from Unicode, parses it to extract
-#   fully-qualified emojis (excluding the Component group), and generates
-#   emoji-list.js in the assets directory.
+#   1. Downloads the latest emoji-test.txt from Unicode, parses it to extract
+#      fully-qualified emojis (excluding the Component group), and generates
+#      emoji-list.js in the assets directory.
+#   2. Downloads the latest Emoji Kitchen metadata from emojikitchen.dev,
+#      optimizes it by removing redundant fields, and generates kitchen-metadata.js.
 #
 # Requirements:
 #   - curl
 #   - awk
+#   - jq
 #   - date
 #
 # Usage:
-#   bash update_emoji.sh
+#   bash emoji_metadata.sh
 # ==============================================================================
 
 set -euo pipefail
 IFS=$'\n\t'
 
 # Logging helpers
-_log() { echo "[$(date +"%H:%M:%S")] $*"; }
+_log() { echo "[$(date +"%H:%M:%S")] $*" >&2; }
 _err() { echo "[$(date +"%H:%M:%S")] Error: $*" >&2; }
 
 # ==============================================================================
 # Configuration
 # ==============================================================================
-URL="https://unicode.org/Public/emoji/latest/emoji-test.txt"
+EMOJI_URL="https://unicode.org/Public/emoji/latest/emoji-test.txt"
+KITCHEN_URL="https://emojikitchen.dev/metadata.json"
+
 SERVICE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ASSETS_DIR="$(cd "$SERVICE_DIR/../assets" && pwd)"
 
 RAW_FILE_PATH="$(mktemp)"
 JS_FILE_PATH="$ASSETS_DIR/emoji-list.js"
+KITCHEN_JS_FILE_PATH="$ASSETS_DIR/kitchen-metadata.js"
 
 trap 'rm -f "$RAW_FILE_PATH"' EXIT
 
 # ==============================================================================
 # Dependency Checks
 # ==============================================================================
-for cmd in curl awk date; do
+for cmd in curl awk jq date; do
   if ! command -v "$cmd" >/dev/null; then
     _err "$cmd is required but not installed."
     exit 1
@@ -56,22 +62,19 @@ if [ ! -w "$ASSETS_DIR" ]; then
 fi
 
 # ==============================================================================
-# Download
+# 1. Update Emoji List
 # ==============================================================================
 _log "Downloading emoji data from Unicode..."
 
-if ! curl --compressed -fsSL "$URL" -o "$RAW_FILE_PATH"; then
+if ! curl --compressed -fsSL "$EMOJI_URL" -o "$RAW_FILE_PATH"; then
   _err "Failed to download emoji data."
   exit 2
 fi
 
-_log "Download complete."
+_log "Unicode download complete."
 
-# ==============================================================================
 # Checksum Calculation
-# ==============================================================================
 checksum="unknown"
-
 if command -v sha256sum >/dev/null; then
   checksum=$(sha256sum "$RAW_FILE_PATH" | awk '{print $1}')
 elif command -v shasum >/dev/null; then
@@ -81,14 +84,10 @@ elif command -v openssl >/dev/null; then
 fi
 
 _log "SHA256: ${checksum:0:12}..."
-
-# ==============================================================================
-# Parse and Generate JS
-# ==============================================================================
 _log "Building emoji list..."
 
 DATE_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-HEADER="// Generated from: $URL\n// Generated on: $DATE_ISO\n// SHA256: $checksum\n\nconst emojiList = "
+HEADER="// Generated from: $EMOJI_URL\n// Generated on: $DATE_ISO\n// SHA256: $checksum\n\nconst emojiList = "
 
 printf "%b" "$HEADER" > "$JS_FILE_PATH"
 
@@ -103,8 +102,6 @@ awk \
 
   # Handle Group Headers
   /^# group:/ {
-    # Extract group name: "# group: Smileys & Emotion" -> "Smileys & Emotion"
-    # index($0, ":") finds the colon. + 2 skips ": "
     g = substr($0, index($0, ":") + 2);
     
     if (g == "Component") {
@@ -129,48 +126,32 @@ awk \
     if (skip || group == "") next;
 
     if ($0 ~ /; fully-qualified/) {
-      # Line format:
-      # 1F600 ; fully-qualified     # 😀 E1.0 grinning face
-      
-      # Find the comment start #
       idx = index($0, "#");
       if (idx == 0) next;
 
-      # content after "# " is "😀 E1.0 grinning face"
       rest = substr($0, idx + 2);
-
-      # Robust parsing: split by whitespace.
-      # Field 1 is emoji. Field 2 might be version (E1.0). Rest is name.
       n = split(rest, parts, " ");
 
       if (n >= 2) {
         emoji = parts[1];
 
-        # Determine where the name starts
-        # Check if parts[2] looks like a version (E1.0, E12.1, etc.)
         if (parts[2] ~ /^E[0-9.]+$/) {
           name_start = 3;
         } else {
           name_start = 2;
         }
 
-        # Reconstruct name
         name = "";
         for (i = name_start; i <= n; i++) {
           name = (name == "" ? "" : name " ") parts[i];
         }
 
-        # Generate Alias
         alias = tolower(name);
         gsub(/[ -]/, "_", alias);
         gsub(/[:.]/, "", alias);
-        # Remove non-alphanumeric characters from start and end
         gsub(/^[^a-z0-9]+|[^a-z0-9]+$/, "", alias);
 
-        # Escape for JSON (backslashes first, then quotes)
-        # Note: In awk strings, we need 8 backslashes to get 2 in output (for JSON \\)
         gsub(/\\/, "\\\\\\\\", name);
-        # And 3 backslashes to get \" in output (for JSON \")
         gsub(/"/, "\\\"", name);
 
         if (!first) printf ",";
@@ -187,8 +168,31 @@ awk \
   }
 ' "$RAW_FILE_PATH" >> "$JS_FILE_PATH"
 
-# ==============================================================================
-# Cleanup
-# ==============================================================================
+_log "Emoji list updated: $JS_FILE_PATH"
 
-_log "Emoji list updated."
+# ==============================================================================
+# 2. Update Emoji Kitchen Metadata
+# ==============================================================================
+_log "Downloading Emoji Kitchen metadata (approx 10MB)..."
+
+if ! curl -sSL "$KITCHEN_URL" | jq -c '
+  .data | to_entries | map({
+    key: .key,
+    value: .value.combinations | to_entries | map({
+      e: .key,
+      d: (.value | map(select(.isLatest == true)) | .[0].date // .value[0].date)
+    })
+  }) | from_entries
+' > "$ASSETS_DIR/kitchen-metadata.json"; then
+  _err "Failed to download or process Emoji Kitchen metadata."
+  exit 4
+fi
+
+_log "Optimization complete: $KITCHEN_JS_FILE_PATH"
+
+# Wrap in a JS constant for easy QML import
+echo "const kitchenMetadata = $(cat "$ASSETS_DIR/kitchen-metadata.json")" > "$KITCHEN_JS_FILE_PATH"
+rm "$ASSETS_DIR/kitchen-metadata.json"
+
+_log "Emoji Kitchen metadata updated: $KITCHEN_JS_FILE_PATH"
+_log "All metadata updates completed successfully!"

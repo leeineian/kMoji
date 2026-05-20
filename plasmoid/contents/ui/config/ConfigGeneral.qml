@@ -329,7 +329,7 @@ Kirigami.ScrollablePage {
         }
 
         function executeScript() {
-            const scriptUrl = Qt.resolvedUrl('../../service/update_emoji.sh')
+            const scriptUrl = Qt.resolvedUrl('../../service/emoji_metadata.sh')
             let path = scriptUrl.toString()
 
             // Strip protocol robustly
