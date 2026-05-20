@@ -2100,6 +2100,14 @@ Item {
                             keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
                             keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
 
+                            property bool keyboardActionPressed: false
+
+                            Timer {
+                                id: keyboardReleaseTimer
+                                interval: 150
+                                onTriggered: kitchenGridView.keyboardActionPressed = false
+                            }
+
                             Keys.onPressed: function(event) {
                                 if (!fullRoot.emojiKeyboardNavigationEnabled) return
 
@@ -2107,11 +2115,15 @@ Item {
                                     if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
                                         kitchenView.emoji1 = fullRoot.filteredEmojis[currentIndex].emoji
                                     }
+                                    keyboardActionPressed = true
+                                    keyboardReleaseTimer.restart()
                                     event.accepted = true
                                 } else if (event.key === Qt.Key_Space) {
                                     if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
                                         kitchenView.emoji2 = fullRoot.filteredEmojis[currentIndex].emoji
                                     }
+                                    keyboardActionPressed = true
+                                    keyboardReleaseTimer.restart()
                                     event.accepted = true
                                 } else if (event.key === Qt.Key_Escape) {
                                     handleEscapePressed()
@@ -2136,6 +2148,49 @@ Item {
                                 active: kitchenGridView.moving || kitchenGridView.contentHeight > kitchenGridView.height
                             }
 
+                            function updateKeyboardHover() {
+                                if (!fullRoot.emojiKeyboardNavigationEnabled) return
+                                if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
+                                    const item = fullRoot.filteredEmojis[currentIndex]
+                                    if (item) {
+                                        if (fullRoot.emojiHoveredEmojiKey !== item.emoji) {
+                                            fullRoot.emojiHoveredEmojiKey = item.emoji
+                                            fullRoot.hoveredEmojiName = item.name
+                                        }
+                                        if (fullRoot.emojiLastHoveredEmojiKey !== item.emoji) {
+                                            fullRoot.emojiLastHoveredEmojiKey = item.emoji
+                                        }
+                                    }
+                                }
+                            }
+
+                            function clearKeyboardHover() {
+                                if (fullRoot.emojiHoveredEmojiKey !== "") {
+                                    fullRoot.emojiHoveredEmojiKey = ""
+                                    fullRoot.hoveredEmojiName = ""
+                                }
+                            }
+
+                            onActiveFocusChanged: {
+                                if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
+                                    if (count > 0) {
+                                        if (currentIndex < 0 || currentIndex >= count) {
+                                            currentIndex = 0
+                                        } else {
+                                            updateKeyboardHover()
+                                        }
+                                    }
+                                } else if (!activeFocus) {
+                                    clearKeyboardHover()
+                                }
+                            }
+
+                            onCurrentIndexChanged: {
+                                if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
+                                    updateKeyboardHover()
+                                }
+                            }
+
                             delegate: Item {
                                 width: fullRoot.internalGridSize
                                 height: fullRoot.internalGridSize
@@ -2145,7 +2200,7 @@ Item {
                                     anchors.margins: 2
                                     color: Kirigami.Theme.highlightColor
                                     radius: 4
-                                    opacity: (mouseArea.pressed || (kitchenGridView.activeFocus && kitchenGridView.currentIndex === index)) ? 1.0 :
+                                    opacity: (mouseArea.pressed || (kitchenGridView.activeFocus && kitchenGridView.currentIndex === index && kitchenGridView.keyboardActionPressed)) ? 1.0 :
                                     (mouseArea.containsMouse || (kitchenGridView.activeFocus && (kitchenGridView.currentIndex === index || fullRoot.isEmojiLastHovered(modelData.emoji, true)))) ? 0.2 : 0
                                 }
 
@@ -2153,7 +2208,7 @@ Item {
                                     anchors.fill: parent
                                     color: "transparent"
                                     radius: 4
-                                    border.width: (mouseArea.pressed || (kitchenGridView.activeFocus && kitchenGridView.currentIndex === index) || mouseArea.containsMouse || (kitchenGridView.activeFocus && (kitchenGridView.currentIndex === index || fullRoot.isEmojiLastHovered(modelData.emoji, true)))) ? 2 : 0
+                                    border.width: (mouseArea.pressed || (kitchenGridView.activeFocus && kitchenGridView.currentIndex === index && kitchenGridView.keyboardActionPressed) || mouseArea.containsMouse || (kitchenGridView.activeFocus && (kitchenGridView.currentIndex === index || fullRoot.isEmojiLastHovered(modelData.emoji, true)))) ? 2 : 0
                                     border.color: Kirigami.Theme.highlightColor
                                 }
                                 
@@ -2512,14 +2567,15 @@ Item {
                                     anchors.fill: parent
                                     color: Kirigami.Theme.highlightColor
                                     radius: 4
-                                    opacity: (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
+                                    opacity: (mouseArea.pressed || (emojiGridView.activeFocus && GridView.isCurrentItem && fullRoot.gridKeyboardActionPressed)) ? 1.0 :
+                                    (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 0.2 : 0
                                 }
 
                                 Rectangle {
                                     anchors.fill: parent
                                     color: "transparent"
                                     radius: 4
-                                    border.width: (mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
+                                    border.width: (mouseArea.pressed || (emojiGridView.activeFocus && GridView.isCurrentItem && fullRoot.gridKeyboardActionPressed) || mouseArea.containsMouse || (emojiGridView.activeFocus && (fullRoot.isEmojiKeyboardFocused(GridView.isCurrentItem, emojiGridView.activeFocus) || fullRoot.isEmojiLastHovered(modelData.emoji, fullRoot.gridIsMouseOver)))) ? 2 : 0
                                     border.color: Kirigami.Theme.highlightColor
                                 }
                             }
