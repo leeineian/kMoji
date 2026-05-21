@@ -32,11 +32,6 @@
       <label>Klipy API Key</label>
       <default>c9d81d227b0b4b2fb4e0bd6f6e52003c</default>
     </entry>
-
-    <entry name="KlipyCopyAction" type="Int">
-      <label>Clipboard Copy Action</label>
-      <default>0</default>
-    </entry>
   </group>
 
 </kcfg>
