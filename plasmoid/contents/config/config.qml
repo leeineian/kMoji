@@ -5,6 +5,6 @@ ConfigModel {
     ConfigCategory {
          name: i18nc("@title", "General")
          icon: "preferences-desktop-navigation"
-         source: "../ui/config/ConfigGeneral.qml"
+         source: "../ui/config.qml"
     }
 }
