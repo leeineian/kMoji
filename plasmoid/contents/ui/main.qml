@@ -2255,6 +2255,7 @@ PlasmoidItem {
                             id: gifView
                             anchors.fill: parent
                             visible: fullRoot.selectedCategory === fullRoot.catGifs
+                            clip: true
 
                             property bool isLoading: false
                             property bool isLoadingMore: false
@@ -2498,10 +2499,10 @@ PlasmoidItem {
                                         return false;
                                         if (!delegateItem.parent)
                                         return false;
-                                        var dummy = gifFlickable.contentY + gifFlickable.height + gifFlickable.contentHeight;
-                                        var absPos = delegateItem.mapToItem(gifFlickable.contentItem, 0, 0);
+                                        var dummy = gifFlickable.contentItem.contentY + gifFlickable.height + gifFlickable.contentHeight;
+                                        var absPos = delegateItem.mapToItem(gifFlickable.contentItem.contentItem, 0, 0);
                                         var absY = absPos ? absPos.y : 0;
-                                        return (absY + height >= gifFlickable.contentY - 200) && (absY <= gifFlickable.contentY + gifFlickable.height + 200);
+                                        return (absY + height >= gifFlickable.contentItem.contentY - 200) && (absY <= gifFlickable.contentItem.contentY + gifFlickable.height + 200);
                                     }
 
                                     onClicked: {
@@ -2580,34 +2581,92 @@ PlasmoidItem {
                                 }
                             }
 
-                            Flickable {
+                            ScrollView {
                                 id: gifFlickable
                                 anchors.fill: parent
-                                anchors.leftMargin: 4
+                                anchors.leftMargin: 0
                                 anchors.topMargin: 0
                                 anchors.bottomMargin: 0
                                 anchors.rightMargin: 0
-                                contentWidth: width
-                                contentHeight: gifLayout.height + (gifView.isLoadingMore ? 48 : 20)
                                 clip: true
+                                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                                ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                                readonly property var activeStickyInfo: {
+                                    if (!gifView.visible || !contentItem) return null;
+                                    let currentY = contentItem.contentY;
+                                    
+                                    let items = [];
+                                    if (typeof gifCategoriesRepeater !== "undefined" && gifCategoriesRepeater) {
+                                        for (let i = 0; i < gifCategoriesRepeater.count; i++) {
+                                            let item = gifCategoriesRepeater.itemAt(i);
+                                            if (item && item.visible) {
+                                                items.push({
+                                                    name: item.catName,
+                                                    item: item,
+                                                    y: item.y,
+                                                    height: item.height,
+                                                    headerHeight: 32,
+                                                    isTrending: false
+                                                });
+                                            }
+                                        }
+                                    }
+                                    if (typeof trendingSection !== "undefined" && trendingSection && trendingSection.visible) {
+                                        items.push({
+                                            name: "GIFs",
+                                            item: trendingSection,
+                                            y: trendingSection.y,
+                                            height: trendingSection.height,
+                                            headerHeight: 32,
+                                            isTrending: true
+                                        });
+                                    }
+
+                                    if (items.length === 0) return null;
+
+                                    let activeIdx = -1;
+                                    for (let i = 0; i < items.length; i++) {
+                                        if (currentY >= items[i].y) {
+                                            activeIdx = i;
+                                        }
+                                    }
+
+                                    if (activeIdx === -1) return null;
+
+                                    let active = items[activeIdx];
+                                    
+                                    // Hide if scroll has completely passed the bottom of the active category
+                                    if (currentY >= active.y + active.height) {
+                                        return null;
+                                    }
+
+                                    let nextItem = (activeIdx + 1 < items.length) ? items[activeIdx + 1] : null;
+                                    let offset = 0;
+                                    if (nextItem && nextItem.y < currentY + active.headerHeight) {
+                                        offset = nextItem.y - (currentY + active.headerHeight);
+                                    } else if (currentY + active.headerHeight > active.y + active.height) {
+                                        offset = (active.y + active.height) - (currentY + active.headerHeight);
+                                    }
+
+                                    return {
+                                        name: active.name,
+                                        item: active.item,
+                                        y: active.y,
+                                        height: active.height,
+                                        isTrending: active.isTrending,
+                                        offset: offset,
+                                        headerHeight: active.headerHeight
+                                    };
+                                }
                                 visible: !gifView.isLoading && !gifSearchTimer.running && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0 || fullRoot.favoriteEmojis.filter(e => e.type === "gif").length > 0 || fullRoot.recentEmojis.filter(e => e.type === "gif").length > 0)
 
-                                ScrollBar.vertical: ScrollBar {}
-
-                                onContentYChanged: {
-                                    if (contentHeight > height && contentY >= contentHeight - height - 500) {
-                                        gifView.fetchMoreGifs();
-                                    }
-                                }
-
-                                WheelHandler {
-                                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                                    onWheel: function (event) {
-                                        const step = 120;
-                                        const delta = event.angleDelta.y;
-                                        const newY = gifFlickable.contentY - (delta / 120) * step;
-                                        gifFlickable.contentY = Math.max(0, Math.min(gifFlickable.contentHeight - gifFlickable.height, newY));
-                                        event.accepted = true;
+                                Connections {
+                                    target: gifFlickable.contentItem
+                                    function onContentYChanged() {
+                                        if (gifFlickable.contentHeight > gifFlickable.height && gifFlickable.contentItem.contentY >= gifFlickable.contentHeight - gifFlickable.height - 500) {
+                                            gifView.fetchMoreGifs();
+                                        }
                                     }
                                 }
 
@@ -2618,12 +2677,14 @@ PlasmoidItem {
                                     spacing: 12
 
                                     Repeater {
+                                        id: gifCategoriesRepeater
                                         model: ["Favorites", "Recent"]
                                         delegate: Column {
                                             id: parentCatLayout
                                             width: parent.width
                                             spacing: 8
                                             property string catName: modelData
+                                            property Item headerItem: catHeader
                                             property var catGifs: {
                                                 let list = catName === "Favorites" 
                                                     ? fullRoot.favoriteEmojis.filter(e => e.type === "gif")
@@ -2652,8 +2713,8 @@ PlasmoidItem {
 
                                                 RowLayout {
                                                     anchors.fill: parent
-                                                    anchors.leftMargin: 4
-                                                    anchors.rightMargin: 4
+                                                    anchors.leftMargin: 8
+                                                    anchors.rightMargin: 8
                                                     spacing: 8
 
                                                     Item {
@@ -2747,62 +2808,226 @@ PlasmoidItem {
                                         }
                                     }
 
-                                    Row {
-                                        id: masonryRow
+                                    Column {
+                                        id: trendingSection
                                         width: parent.width
-                                        spacing: 6
+                                        spacing: 8
                                         visible: gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0
 
-                                        readonly property int numColumns: width > 360 ? 3 : 2
-                                    readonly property int columnWidth: Math.floor((width - (numColumns - 1) * spacing) / numColumns)
+                                        Item {
+                                            id: trendingHeader
+                                            width: parent.width
+                                            height: 32
+                                            property bool isExpanded: true
 
-                                    Column {
-                                        id: col0
-                                        spacing: 6
-                                        width: masonryRow.columnWidth
-                                        property real baseY: parent.y
-                                        anchors.top: parent.top
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                color: trendingHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (trendingHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                                border.color: (trendingHeaderMouse.pressed || trendingHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                                border.width: 1
+                                                radius: 4
+                                            }
 
-                                        Repeater {
-                                            model: gifCol0Model
-                                            delegate: gifDelegate
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.leftMargin: 8
+                                                anchors.rightMargin: 8
+                                                spacing: 8
+
+                                                Item {
+                                                    implicitWidth: 16
+                                                    implicitHeight: 16
+                                                    Kirigami.Icon {
+                                                        anchors.centerIn: parent
+                                                        source: trendingHeader.isExpanded ? "go-down" : "go-next"
+                                                        width: 16
+                                                        height: 16
+                                                    }
+                                                }
+
+                                                PlasmaComponents.Label {
+                                                    text: fullRoot.filter !== "" ? i18n("Search Results") : i18n("GIFs")
+                                                    font.bold: true
+                                                    font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                                }
+
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    height: 1
+                                                    color: Kirigami.Theme.textColor
+                                                    opacity: 0.3
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: trendingHeaderMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                acceptedButtons: Qt.LeftButton
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: function(mouse) {
+                                                    if (mouse.button === Qt.LeftButton) {
+                                                        trendingHeader.isExpanded = !trendingHeader.isExpanded;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+
+
+                                        Row {
+                                            id: masonryRow
+                                            width: parent.width
+                                            spacing: 6
+                                            visible: trendingHeader.isExpanded && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0)
+
+                                            readonly property int numColumns: width > 360 ? 3 : 2
+                                        readonly property int columnWidth: Math.floor((width - (numColumns - 1) * spacing) / numColumns)
+
+                                        Column {
+                                            id: col0
+                                            spacing: 6
+                                            width: masonryRow.columnWidth
+                                            property real baseY: parent.y
+                                            anchors.top: parent.top
+
+                                            Repeater {
+                                                model: gifCol0Model
+                                                delegate: gifDelegate
+                                            }
+                                        }
+
+                                        Column {
+                                            id: col1
+                                            spacing: 6
+                                            width: masonryRow.columnWidth
+                                            property real baseY: parent.y
+                                            anchors.top: parent.top
+
+                                            Repeater {
+                                                model: gifCol1Model
+                                                delegate: gifDelegate
+                                            }
+                                        }
+
+                                        Column {
+                                            id: col2
+                                            spacing: 6
+                                            width: masonryRow.columnWidth
+                                            property real baseY: parent.y
+                                            visible: masonryRow.numColumns === 3
+                                            anchors.top: parent.top
+
+                                            Repeater {
+                                                model: gifCol2Model
+                                                delegate: gifDelegate
+                                            }
                                         }
                                     }
 
-                                    Column {
-                                        id: col1
-                                        spacing: 6
-                                        width: masonryRow.columnWidth
-                                        property real baseY: parent.y
-                                        anchors.top: parent.top
-
-                                        Repeater {
-                                            model: gifCol1Model
-                                            delegate: gifDelegate
-                                        }
-                                    }
-
-                                    Column {
-                                        id: col2
-                                        spacing: 6
-                                        width: masonryRow.columnWidth
-                                        property real baseY: parent.y
-                                        visible: masonryRow.numColumns === 3
-                                        anchors.top: parent.top
-
-                                        Repeater {
-                                            model: gifCol2Model
-                                            delegate: gifDelegate
+     PlasmaComponents.BusyIndicator {
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            running: gifView.isLoadingMore
+                                            visible: gifView.isLoadingMore && trendingHeader.isExpanded
+                                            width: 24
+                                            height: 24
                                         }
                                     }
                                 }
+                            }
+                        }
 
-                                    PlasmaComponents.BusyIndicator {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        running: gifView.isLoadingMore
-                                        visible: gifView.isLoadingMore
-                                        width: 24
-                                        height: 24
+                        Item {
+                            id: gifFloatingStickyHeader
+                            parent: gifView
+                            width: gifFlickable.width - ((gifFlickable.ScrollBar.vertical && gifFlickable.ScrollBar.vertical.visible) ? gifFlickable.ScrollBar.vertical.width : 0)
+                            height: 32
+                            z: 10
+                            visible: gifView.visible && gifFlickable.activeStickyInfo !== null
+                            
+                            x: gifFlickable.x
+                            y: gifFlickable.y + (gifFlickable.activeStickyInfo ? gifFlickable.activeStickyInfo.offset : 0)
+
+                            readonly property var info: gifFlickable.activeStickyInfo
+                            readonly property string catName: info ? info.name : ""
+                            readonly property bool isTrending: info ? (info.isTrending === true) : false
+                            readonly property bool isExpanded: info ? (isTrending ? trendingHeader.isExpanded : info.item.headerItem.isExpanded) : true
+                            readonly property int count: info ? (isTrending ? 0 : info.item.catGifs.length) : 0
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: Kirigami.Theme.backgroundColor
+                            }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: gifStickyHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (gifStickyHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                border.color: (gifStickyHeaderMouse.pressed || gifStickyHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                border.width: 1
+                                radius: 4
+                            }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                spacing: 8
+
+                                Item {
+                                    implicitWidth: 16
+                                    implicitHeight: 16
+                                    Kirigami.Icon {
+                                        anchors.centerIn: parent
+                                        source: gifFloatingStickyHeader.isExpanded ? "go-down" : "go-next"
+                                        width: 16
+                                        height: 16
+                                    }
+                                }
+
+                                PlasmaComponents.Label {
+                                    text: gifFloatingStickyHeader.isTrending ? (fullRoot.filter !== "" ? i18n("Search Results") : i18n("GIFs")) : (gifFloatingStickyHeader.catName === "Favorites" ? i18n("Favorites") : i18n("Recent"))
+                                    font.bold: true
+                                    font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                }
+
+                                Rectangle {
+                                    width: gifStickyCountLabel.contentWidth + 12
+                                    height: 18
+                                    radius: 9
+                                    color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
+                                    visible: !gifFloatingStickyHeader.isTrending
+
+                                    PlasmaComponents.Label {
+                                        id: gifStickyCountLabel
+                                        anchors.centerIn: parent
+                                        text: gifFloatingStickyHeader.count
+                                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                        font.bold: true
+                                        color: Kirigami.Theme.textColor
+                                    }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 1
+                                    color: Kirigami.Theme.textColor
+                                    opacity: 0.3
+                                }
+                            }
+
+                            MouseArea {
+                                id: gifStickyHeaderMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.LeftButton
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: function(mouse) {
+                                    if (mouse.button === Qt.LeftButton && gifFloatingStickyHeader.info) {
+                                        if (gifFloatingStickyHeader.isTrending) {
+                                            trendingHeader.isExpanded = !trendingHeader.isExpanded;
+                                        } else {
+                                            gifFloatingStickyHeader.info.item.headerItem.isExpanded = !gifFloatingStickyHeader.info.item.headerItem.isExpanded;
+                                        }
                                     }
                                 }
                             }
@@ -2860,10 +3085,17 @@ PlasmoidItem {
 
                                 let active = items[activeIdx];
                                 
+                                // Hide if scroll has completely passed the bottom of the active category
+                                if (currentY >= active.y + active.height) {
+                                    return null;
+                                }
+
                                 let nextItem = (activeIdx + 1 < items.length) ? items[activeIdx + 1] : null;
                                 let offset = 0;
                                 if (nextItem && nextItem.y < currentY + active.headerHeight) {
                                     offset = nextItem.y - (currentY + active.headerHeight);
+                                } else if (currentY + active.headerHeight > active.y + active.height) {
+                                    offset = (active.y + active.height) - (currentY + active.headerHeight);
                                 }
 
                                 return {
