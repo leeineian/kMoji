@@ -6,7 +6,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 
 import "../service/functions.js" as IconEmojis
-import "../assets/emoji-list.js" as EmojiList
+import "../assets/emoji-metadata.js" as EmojiList
 
 MouseArea {
     id: compactRoot

@@ -11,20 +11,20 @@ permissions:
 
 jobs:
   sync:
-    name: Regenerate emoji-list.js
+    name: Regenerate emoji metadata
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run update_emoji.sh
-        run: bash plasmoid/contents/service/update_emoji.sh
+      - name: Run metadata.sh
+        run: bash plasmoid/contents/service/metadata.sh
 
       - name: Check for changes
         id: diff
         run: |
-          if git diff --quiet plasmoid/contents/assets/emoji-list.js; then
+          if git diff --quiet plasmoid/contents/assets/emoji-metadata.js; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -35,6 +35,6 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add plasmoid/contents/assets/emoji-list.js
+          git add plasmoid/contents/assets/emoji-metadata.js
           git commit -m "chore: sync emoji database [skip ci]"
           git push

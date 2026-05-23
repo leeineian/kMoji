@@ -48,4 +48,4 @@ curl -fsSL https://raw.githubusercontent.com/leeineian/kMoji/master/scripts/get.
 ## Notes
 - Requires Plasma 6 (KF6) and Qt 6.
 - Clipboard uses KDE KQuickControlsAddons. Ensure the `org.kde.kquickcontrolsaddons` QML module is present.
-- Emoji data is loaded from `assets/emoji-list.js`
+- Emoji data is loaded from `assets/emoji-metadata.js`

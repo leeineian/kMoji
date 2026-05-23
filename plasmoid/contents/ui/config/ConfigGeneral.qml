@@ -8,7 +8,7 @@ import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as Plasma5Support
 
-import "../../assets/emoji-list.js" as EmojiList
+import "../../assets/emoji-metadata.js" as EmojiList
 import "../../service/functions.js" as EmojiIcons
 
 Kirigami.ScrollablePage {
