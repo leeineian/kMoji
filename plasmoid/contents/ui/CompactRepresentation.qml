@@ -5,7 +5,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 
-import "../service/functions.js" as IconEmojis
+import "../service/modules.js" as IconEmojis
 import "../assets/emoji-metadata.js" as EmojiList
 
 MouseArea {

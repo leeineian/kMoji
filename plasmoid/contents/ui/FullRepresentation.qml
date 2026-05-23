@@ -16,6 +16,7 @@ import org.kde.plasma.plasma5support as Plasma5Support
 
 import "../assets/emoji-metadata.js" as EmojiList
 import "../assets/emoji-kitchen-metadata.js" as KitchenMetadata
+import "../service/modules.js" as ServiceFunctions
 
 Item {
     id: fullRoot
@@ -2858,15 +2859,8 @@ Item {
                             gifView.isLoadingMore = true
                         }
 
-                        var apiKey = (plasmoid.configuration.KlipyApiKey || "c9d81d227b0b4b2fb4e0bd6f6e52003c").trim()
                         var page = append ? gifView.currentPage : 1
-                        var url
-
-                        if (!query || query.trim() === "") {
-                            url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/trending?per_page=24&page=" + page
-                        } else {
-                            url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/search?q=" + encodeURIComponent(query) + "&per_page=24&page=" + page
-                        }
+                        var url = ServiceFunctions.buildGifUrl(plasmoid.configuration.KlipyApiKey, query, page, 24)
 
                         var xhr = new XMLHttpRequest()
                         xhr.open("GET", url)
@@ -2876,41 +2870,24 @@ Item {
                                 gifView.isLoadingMore = false
                                 if (xhr.status === 200) {
                                     var response = JSON.parse(xhr.responseText)
-                                    if (response.result && response.data && response.data.data) {
-                                        var list = response.data.data
-                                        var parsed = []
-                                        for (var i = 0; i < list.length; i++) {
-                                            var item = list[i]
-                                            var fileObj = item.file && item.file.sm && item.file.sm.gif ? item.file.sm.gif : null
-                                            if (!fileObj) continue
-
-                                            var rawGif = item.file && item.file.hd && item.file.hd.gif ? item.file.hd.gif.url : ""
-                                            var previewGif = fileObj.url
-                                            var w = fileObj.width || 200
-                                            var h = fileObj.height || 200
-                                            var ratio = w / h
-
-                                            if (rawGif !== "") {
-                                                parsed.push({
-                                                    title: item.title || "Klipy GIF",
-                                                    rawUrl: rawGif,
-                                                    previewUrl: previewGif,
-                                                    aspectRatio: ratio
-                                                })
-                                            }
-                                        }
-
-                                        if (append) {
-                                            rawGifsList = rawGifsList.concat(parsed)
-                                            appendToColumns(parsed)
-                                        } else {
-                                            rawGifsList = parsed
-                                            redistributeGifs()
-                                        }
-
-                                        gifView.hasNextPage = response.data.has_next === true
-                                        gifView.currentPage = (response.data.current_page || page) + 1
+                                    var responseData = response && response.data ? response.data : null
+                                    if (!responseData) {
+                                        console.log("ERROR: Klipy API returned an unexpected payload")
+                                        return
                                     }
+
+                                    var parsed = ServiceFunctions.parseGifItems(response)
+
+                                    if (append) {
+                                        rawGifsList = rawGifsList.concat(parsed)
+                                        appendToColumns(parsed)
+                                    } else {
+                                        rawGifsList = parsed
+                                        redistributeGifs()
+                                    }
+
+                                    gifView.hasNextPage = responseData.has_next === true
+                                    gifView.currentPage = (responseData.current_page || page) + 1
                                 } else {
                                     console.log("ERROR: Klipy API returned status: " + xhr.status)
                                 }
