@@ -45,6 +45,8 @@ Kirigami.ScrollablePage {
     property alias cfg_AlwaysAnimateGifs: alwaysAnimateGifs.checked
     property alias cfg_KlipyApiKey: klipyApiKey.text
 
+    property string randomGifUrl: ""
+
     function emojiFontPixelSize(gridSize) {
         const size = gridSize || 0
         const scaled = Math.floor(size * 0.7)
@@ -89,8 +91,33 @@ Kirigami.ScrollablePage {
         }
     }
 
+    function fetchRandom4x4Gif() {
+        const apiKey = plasmoid.configuration.KlipyApiKey || "s9q3axg5VURfGO45IDSDhJ1Nxm445kzNdiRF4lmbcVkJaZDe9ShO01YIOvIvtaY2"
+        const url = "https://api.klipy.com/api/v1/" + apiKey + "/gifs/search?q=4x4&per_page=24&page=1"
+        const xhr = new XMLHttpRequest()
+        xhr.open("GET", url)
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    const response = JSON.parse(xhr.responseText)
+                    const dataList = response && response.data && response.data.data ? response.data.data : []
+                    if (dataList.length > 0) {
+                        const randomItem = dataList[Math.floor(Math.random() * dataList.length)]
+                        if (randomItem && randomItem.file && randomItem.file.sm && randomItem.file.sm.gif) {
+                            root.randomGifUrl = randomItem.file.sm.gif.url
+                        }
+                    }
+                } catch(e) {
+                    console.log("Failed to parse random 4x4 gif: " + e)
+                }
+            }
+        }
+        xhr.send()
+    }
+
     Component.onCompleted: {
         rollSizeEmojiLabels()
+        fetchRandom4x4Gif()
     }
 
     ColumnLayout {
@@ -107,9 +134,16 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
 
-                PlasmaComponents.Label {
-                    text: root.smallSizeEmojiLabel
-                    font.pixelSize: root.emojiFontPixelSize(gridSizeSlider.sizeValues[0])
+                Item {
+                    width: 48
+                    height: 48
+                    Layout.alignment: Qt.AlignVCenter
+
+                    PlasmaComponents.Label {
+                        anchors.centerIn: parent
+                        text: root.smallSizeEmojiLabel
+                        font.pixelSize: root.emojiFontPixelSize(gridSizeSlider.sizeValues[0])
+                    }
                 }
 
                 PlasmaComponents.Slider {
@@ -134,9 +168,91 @@ Kirigami.ScrollablePage {
                     }
                 }
 
-                PlasmaComponents.Label {
-                    text: root.largeSizeEmojiLabel
-                    font.pixelSize: root.emojiFontPixelSize(gridSizeSlider.sizeValues[2])
+                Item {
+                    width: 48
+                    height: 48
+                    Layout.alignment: Qt.AlignVCenter
+
+                    PlasmaComponents.Label {
+                        anchors.centerIn: parent
+                        text: root.largeSizeEmojiLabel
+                        font.pixelSize: root.emojiFontPixelSize(gridSizeSlider.sizeValues[2])
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Kirigami.Units.smallSpacing
+
+                Item {
+                    width: 48
+                    height: 48
+                    Layout.alignment: Qt.AlignVCenter
+
+                    AnimatedImage {
+                        anchors.centerIn: parent
+                        width: 24
+                        height: 24
+                        source: root.randomGifUrl
+                        fillMode: Image.PreserveAspectFit
+                        playing: true
+                        visible: root.randomGifUrl !== ""
+                    }
+
+                    Kirigami.Icon {
+                        anchors.centerIn: parent
+                        width: 24
+                        height: 24
+                        source: "fileview-preview-symbolic"
+                        visible: root.randomGifUrl === ""
+                    }
+                }
+
+                PlasmaComponents.Slider {
+                    id: gifSizeSlider
+                    Layout.fillWidth: true
+                    from: 0
+                    to: 2
+                    stepSize: 1
+                    snapMode: Slider.SnapAlways
+
+                    readonly property var sizeValues: [90, 125, 160]
+
+                    value: {
+                        const current = plasmoid.configuration.GifSize
+                        if (current <= 90) return 0
+                        if (current >= 160) return 2
+                        return 1
+                    }
+
+                    onMoved: {
+                        plasmoid.configuration.GifSize = sizeValues[value]
+                    }
+                }
+
+                Item {
+                    width: 48
+                    height: 48
+                    Layout.alignment: Qt.AlignVCenter
+
+                    AnimatedImage {
+                        anchors.centerIn: parent
+                        width: 44
+                        height: 44
+                        source: root.randomGifUrl
+                        fillMode: Image.PreserveAspectFit
+                        playing: true
+                        visible: root.randomGifUrl !== ""
+                    }
+
+                    Kirigami.Icon {
+                        anchors.centerIn: parent
+                        width: 44
+                        height: 44
+                        source: "fileview-preview-symbolic"
+                        visible: root.randomGifUrl === ""
+                    }
                 }
             }
         }

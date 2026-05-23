@@ -287,6 +287,17 @@ PlasmoidItem {
                 return configValue;
             }
 
+            readonly property int gifPreferredWidth: {
+                var configValue = plasmoid.configuration.GifSize;
+                if (configValue === undefined || configValue === null) {
+                    return 125;
+                }
+                if (configValue <= 0) return 90;
+                if (configValue === 1) return 125;
+                if (configValue === 2) return 160;
+                return configValue;
+            }
+
             property var emojiGridView: null
             property var emojiExternalScrollBar: null
             property string emojiHoveredEmojiKey: ""
@@ -445,10 +456,11 @@ PlasmoidItem {
                 return activeKitchens;
             }
 
-            readonly property int favRecentsNumColumns: (fullRoot.width - 16) > 360 ? 3 : 2
+            readonly property int favRecentsNumColumns: Math.max(2, Math.min(4, Math.floor((fullRoot.width - 16) / gifPreferredWidth)))
             property var activeGifCol0: []
             property var activeGifCol1: []
             property var activeGifCol2: []
+            property var activeGifCol3: []
             property int _lastNumCols: -1
 
             onActiveGifsChanged: _updateActiveGifCols(favRecentsNumColumns)
@@ -458,32 +470,38 @@ PlasmoidItem {
                 _lastNumCols = numCols;
 
                 const gifs = activeGifs;
-                const c0 = [], c1 = [], c2 = [];
+                const c0 = [], c1 = [], c2 = [], c3 = [];
                 for (let i = 0; i < gifs.length; i++) {
                     const col = i % numCols;
                     if (col === 0)
-                    c0.push(gifs[i]);
+                        c0.push(gifs[i]);
                     else if (col === 1)
-                    c1.push(gifs[i]);
+                        c1.push(gifs[i]);
+                    else if (col === 2)
+                        c2.push(gifs[i]);
                     else
-                    c2.push(gifs[i]);
+                        c3.push(gifs[i]);
                 }
 
                 _syncListModel(favGifCol0Model, c0, "rawUrl");
                 _syncListModel(favGifCol1Model, c1, "rawUrl");
                 _syncListModel(favGifCol2Model, numCols >= 3 ? c2 : [], "rawUrl");
+                _syncListModel(favGifCol3Model, numCols >= 4 ? c3 : [], "rawUrl");
 
                 activeGifCol0 = c0;
                 activeGifCol1 = c1;
                 activeGifCol2 = numCols >= 3 ? c2 : [];
+                activeGifCol3 = numCols >= 4 ? c3 : [];
             }
 
             function getActiveGifCol(colIndex, numCols) {
                 if (colIndex === 0)
-                return activeGifCol0;
+                    return activeGifCol0;
                 if (colIndex === 1)
-                return activeGifCol1;
-                return activeGifCol2;
+                    return activeGifCol1;
+                if (colIndex === 2)
+                    return activeGifCol2;
+                return activeGifCol3;
             }
 
             property bool gridIsMouseOver: false
@@ -1444,6 +1462,9 @@ PlasmoidItem {
             ListModel {
                 id: favGifCol2Model
             }
+            ListModel {
+                id: favGifCol3Model
+            }
 
             Timer {
                 id: pastePlaceholderResetTimer
@@ -2273,11 +2294,22 @@ PlasmoidItem {
                             ListModel {
                                 id: gifCol2Model
                             }
-                            property var colModels: [gifCol0Model, gifCol1Model, gifCol2Model]
+                            ListModel {
+                                id: gifCol3Model
+                            }
+                            property var colModels: [gifCol0Model, gifCol1Model, gifCol2Model, gifCol3Model]
                             property var rawGifsList: []
                             property int gifCol0Height: 0
                             property int gifCol1Height: 0
                             property int gifCol2Height: 0
+                            property int gifCol3Height: 0
+
+                            Connections {
+                                target: plasmoid.configuration
+                                function onGifSizeChanged() {
+                                    redistributeTimer.restart();
+                                }
+                            }
 
                             onWidthChanged: {
                                 redistributeTimer.restart();
@@ -2363,17 +2395,19 @@ PlasmoidItem {
                                 gifCol0Height = colHeights[0];
                                 gifCol1Height = colHeights[1];
                                 gifCol2Height = colHeights[2];
+                                gifCol3Height = colHeights[3];
                             }
 
                             function redistributeGifs() {
                                 gifCol0Model.clear();
                                 gifCol1Model.clear();
                                 gifCol2Model.clear();
-                                _processMasonryItems(rawGifsList, [0, 0, 0]);
+                                gifCol3Model.clear();
+                                _processMasonryItems(rawGifsList, [0, 0, 0, 0]);
                             }
 
                             function appendToColumns(newItems) {
-                                _processMasonryItems(newItems, [gifCol0Height, gifCol1Height, gifCol2Height]);
+                                _processMasonryItems(newItems, [gifCol0Height, gifCol1Height, gifCol2Height, gifCol3Height]);
                             }
 
                             function fetchGifs(query, append) {
@@ -2471,7 +2505,7 @@ PlasmoidItem {
                             PlasmaComponents.Label {
                                 anchors.centerIn: parent
                                 text: gifView.apiErrorMsg !== "" ? gifView.apiErrorMsg : (fullRoot.filter !== "" ? i18n("No GIFs found :(") : i18n("No internet or Klipy API error"))
-                                visible: !gifView.isLoading && !gifSearchTimer.running && gifCol0Model.count === 0 && gifCol1Model.count === 0 && gifCol2Model.count === 0
+                                visible: !gifView.isLoading && !gifSearchTimer.running && gifCol0Model.count === 0 && gifCol1Model.count === 0 && gifCol2Model.count === 0 && gifCol3Model.count === 0
                                 font.pixelSize: fullRoot.fontSizeEmptyLabel
                                 opacity: 0.6
                                 horizontalAlignment: Text.AlignHCenter
@@ -2659,7 +2693,7 @@ PlasmoidItem {
                                         headerHeight: active.headerHeight
                                     };
                                 }
-                                visible: !gifView.isLoading && !gifSearchTimer.running && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0 || fullRoot.favoriteEmojis.filter(e => e.type === "gif").length > 0 || fullRoot.recentEmojis.filter(e => e.type === "gif").length > 0)
+                                visible: !gifView.isLoading && !gifSearchTimer.running && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0 || gifCol3Model.count > 0 || fullRoot.favoriteEmojis.filter(e => e.type === "gif").length > 0 || fullRoot.recentEmojis.filter(e => e.type === "gif").length > 0)
 
                                 Connections {
                                     target: gifFlickable.contentItem
@@ -2812,7 +2846,7 @@ PlasmoidItem {
                                         id: trendingSection
                                         width: parent.width
                                         spacing: 8
-                                        visible: gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0
+                                        visible: gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0 || gifCol3Model.count > 0
 
                                         Item {
                                             id: trendingHeader
@@ -2873,59 +2907,71 @@ PlasmoidItem {
                                             }
                                         }
 
-
-
                                         Row {
                                             id: masonryRow
                                             width: parent.width
                                             spacing: 6
-                                            visible: trendingHeader.isExpanded && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0)
+                                            visible: trendingHeader.isExpanded && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0 || gifCol3Model.count > 0)
 
-                                            readonly property int numColumns: width > 360 ? 3 : 2
-                                        readonly property int columnWidth: Math.floor((width - (numColumns - 1) * spacing) / numColumns)
+                                            readonly property int numColumns: Math.max(2, Math.min(4, Math.floor(width / gifPreferredWidth)))
+                                            readonly property int columnWidth: Math.floor((width - (numColumns - 1) * spacing) / numColumns)
 
-                                        Column {
-                                            id: col0
-                                            spacing: 6
-                                            width: masonryRow.columnWidth
-                                            property real baseY: parent.y
-                                            anchors.top: parent.top
+                                            Column {
+                                                id: col0
+                                                spacing: 6
+                                                width: masonryRow.columnWidth
+                                                property real baseY: parent.y
+                                                anchors.top: parent.top
 
-                                            Repeater {
-                                                model: gifCol0Model
-                                                delegate: gifDelegate
+                                                Repeater {
+                                                    model: gifCol0Model
+                                                    delegate: gifDelegate
+                                                }
+                                            }
+
+                                            Column {
+                                                id: col1
+                                                spacing: 6
+                                                width: masonryRow.columnWidth
+                                                property real baseY: parent.y
+                                                anchors.top: parent.top
+
+                                                Repeater {
+                                                    model: gifCol1Model
+                                                    delegate: gifDelegate
+                                                }
+                                            }
+
+                                            Column {
+                                                id: col2
+                                                spacing: 6
+                                                width: masonryRow.columnWidth
+                                                property real baseY: parent.y
+                                                visible: masonryRow.numColumns >= 3
+                                                anchors.top: parent.top
+
+                                                Repeater {
+                                                    model: gifCol2Model
+                                                    delegate: gifDelegate
+                                                }
+                                            }
+
+                                            Column {
+                                                id: col3
+                                                spacing: 6
+                                                width: masonryRow.columnWidth
+                                                property real baseY: parent.y
+                                                visible: masonryRow.numColumns >= 4
+                                                anchors.top: parent.top
+
+                                                Repeater {
+                                                    model: gifCol3Model
+                                                    delegate: gifDelegate
+                                                }
                                             }
                                         }
 
-                                        Column {
-                                            id: col1
-                                            spacing: 6
-                                            width: masonryRow.columnWidth
-                                            property real baseY: parent.y
-                                            anchors.top: parent.top
-
-                                            Repeater {
-                                                model: gifCol1Model
-                                                delegate: gifDelegate
-                                            }
-                                        }
-
-                                        Column {
-                                            id: col2
-                                            spacing: 6
-                                            width: masonryRow.columnWidth
-                                            property real baseY: parent.y
-                                            visible: masonryRow.numColumns === 3
-                                            anchors.top: parent.top
-
-                                            Repeater {
-                                                model: gifCol2Model
-                                                delegate: gifDelegate
-                                            }
-                                        }
-                                    }
-
-     PlasmaComponents.BusyIndicator {
+                                        PlasmaComponents.BusyIndicator {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             running: gifView.isLoadingMore
                                             visible: gifView.isLoadingMore && trendingHeader.isExpanded
@@ -4738,10 +4784,21 @@ PlasmoidItem {
                                         Column {
                                             spacing: 6
                                             width: favRecentsMasonryRow.columnWidth
-                                            visible: favRecentsMasonryRow.numColumns === 3
+                                            visible: favRecentsMasonryRow.numColumns >= 3
 
                                             Repeater {
                                                 model: favGifCol2Model
+                                                delegate: favRecGifDelegate
+                                            }
+                                        }
+
+                                        Column {
+                                            spacing: 6
+                                            width: favRecentsMasonryRow.columnWidth
+                                            visible: favRecentsMasonryRow.numColumns >= 4
+
+                                            Repeater {
+                                                model: favGifCol3Model
                                                 delegate: favRecGifDelegate
                                             }
                                         }

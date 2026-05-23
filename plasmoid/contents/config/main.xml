@@ -7,10 +7,17 @@
 
   <group name="Settings">
     <entry name="GridSize" type="Int">
-      <label>Emoji grid size (pixels)</label>
+      <label>Emoji grid scale</label>
       <default>44</default>
       <min>32</min>
       <max>64</max>
+    </entry>
+
+    <entry name="GifSize" type="Int">
+      <label>GIF grid scale</label>
+      <default>125</default>
+      <min>90</min>
+      <max>160</max>
     </entry>
 
     <entry name="CloseAfterSelection" type="Bool">
