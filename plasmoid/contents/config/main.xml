@@ -5,7 +5,7 @@
       http://www.kde.org/standards/kcfg/1.0/kcfg.xsd" >
  <kcfgfile name=""/>
 
-  <group name="General">
+  <group name="Settings">
     <entry name="GridSize" type="Int">
       <label>Emoji grid size (pixels)</label>
       <default>44</default>

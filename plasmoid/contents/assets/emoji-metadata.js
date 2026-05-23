@@ -1,3 +1,4 @@
+.pragma library
 // Generated from: https://unicode.org/Public/emoji/latest/emoji-test.txt
 // Generated on: 2026-05-20T13:53:16Z
 // SHA256: 1d8a944f88d7952f7ef7c5167fef3c67995bcae24543949710231b03a201acda
