@@ -287,7 +287,7 @@ PlasmoidItem {
                 return configValue;
             }
 
-            property alias emojiGridView: emojiGridView
+            property var emojiGridView: null
             property var emojiExternalScrollBar: null
             property string emojiHoveredEmojiKey: ""
             property string emojiLastHoveredEmojiKey: ""
@@ -299,7 +299,7 @@ PlasmoidItem {
                 return kitchenView;
                 if (selectedCategory === catGifs)
                 return gifView;
-                return emojiGridView;
+                return null;
             }
             property Item emojiTabPreviousTarget: categoryListView.count > 0 ? (categoryListView.itemAtIndex(categoryListView.count - 1) ? categoryListView.itemAtIndex(categoryListView.count - 1) : sidebarToggleButton) : sidebarToggleButton
 
@@ -326,7 +326,6 @@ PlasmoidItem {
                 return topBlock + separatorHeight + sidebarButtons + categoriesBlock + separatorHeight + bottomBlock;
             }
 
-            readonly property string catAll: "All"
             readonly property string catFavorites: "Favorites"
             readonly property string catRecent: "Recent"
             readonly property string catEmojiKitchen: "Emoji Kitchen"
@@ -358,11 +357,6 @@ PlasmoidItem {
                     name: catEmojiKitchen,
                     displayName: i18n("Emoji Kitchen"),
                     icon: "path-union-symbolic"
-                },
-                {
-                    name: catAll,
-                    displayName: i18n("All"),
-                    icon: "view-list-icons"
                 },
                 {
                     name: "Smileys & Emotion",
@@ -413,8 +407,10 @@ PlasmoidItem {
 
             property var emojiList: []
             property string filter: ""
+            property string lastFilterForGroups: "-1"
             property var filteredEmojis: []
-            property string selectedCategory: catAll
+            property string selectedCategory: "Smileys & Emotion"
+            property var filteredEmojiByGroup: ({})
             property var recentEmojis: []
             property var favoriteEmojis: []
 
@@ -628,21 +624,29 @@ PlasmoidItem {
                     if (settings.recentEmojisJson && settings.recentEmojisJson !== "[]") {
                         let parsed = JSON.parse(settings.recentEmojisJson);
                         if (Array.isArray(parsed)) {
-                            recentEmojis = parsed.map(item => {
-                                if (item && item.type === "gif") {
+                            let validItems = [];
+                            parsed.forEach(item => {
+                                if (!item) return;
+                                const t = item.type || "emoji";
+                                if (t === "emoji" && (!item.emoji || typeof item.emoji !== 'string')) return;
+                                if (t === "gif" && (!item.rawUrl || typeof item.rawUrl !== 'string')) return;
+                                if (t === "kitchen" && (!item.url || typeof item.url !== 'string')) return;
+                                
+                                if (t === "gif") {
                                     let r = item.aspectRatio;
                                     if (isNaN(r) || !r || r <= 0)
                                     item.aspectRatio = 1.0;
                                 }
-                                return item;
+                                validItems.push(item);
                             });
+                            recentEmojis = validItems;
                             if (recentEmojis.length > 100) {
                                 recentEmojis = recentEmojis.slice(0, 100);
-                                try {
-                                    settings.recentEmojisJson = JSON.stringify(recentEmojis);
-                                } catch (e) {
-                                    console.log("Failed to save trimmed recent emojis:", e);
-                                }
+                            }
+                            try {
+                                settings.recentEmojisJson = JSON.stringify(recentEmojis);
+                            } catch (e) {
+                                console.log("Failed to save trimmed recent emojis:", e);
                             }
                             return;
                         }
@@ -659,14 +663,27 @@ PlasmoidItem {
                     if (settings.favoriteEmojisJson && settings.favoriteEmojisJson !== "[]") {
                         let parsed = JSON.parse(settings.favoriteEmojisJson);
                         if (Array.isArray(parsed)) {
-                            favoriteEmojis = parsed.map(item => {
-                                if (item && item.type === "gif") {
+                            let validItems = [];
+                            parsed.forEach(item => {
+                                if (!item) return;
+                                const t = item.type || "emoji";
+                                if (t === "emoji" && (!item.emoji || typeof item.emoji !== 'string')) return;
+                                if (t === "gif" && (!item.rawUrl || typeof item.rawUrl !== 'string')) return;
+                                if (t === "kitchen" && (!item.url || typeof item.url !== 'string')) return;
+                                
+                                if (t === "gif") {
                                     let r = item.aspectRatio;
                                     if (isNaN(r) || !r || r <= 0)
                                     item.aspectRatio = 1.0;
                                 }
-                                return item;
+                                validItems.push(item);
                             });
+                            favoriteEmojis = validItems;
+                            try {
+                                settings.favoriteEmojisJson = JSON.stringify(favoriteEmojis);
+                            } catch (e) {
+                                console.log("Failed to save filtered favorite emojis:", e);
+                            }
                             return;
                         }
                     }
@@ -872,28 +889,36 @@ PlasmoidItem {
 
                 let result = emojiList;
 
-                if (selectedCategory === catRecent) {
+                if (selectedCategory === catGifs) {
+                    result = activeGifs;
+                } else if (selectedCategory === catRecent) {
                     result = recentEmojis;
                 } else if (selectedCategory === catFavorites) {
                     result = favoriteEmojis;
                 } else if (selectedCategory === catEmojiKitchen) {
                     result = kitchenEmojiList;
-                } else if (selectedCategory !== catAll) {
+                } else {
                     result = emojiByGroup[selectedCategory] || [];
                 }
 
                 if (filter && filter.trim() !== "") {
                     result = performFilter(result, filter);
-
-                    if (result.length === 0 && selectedCategory !== catAll) {
-                        const globalResult = performFilter(emojiList, filter);
-                        if (globalResult.length > 0) {
-                            selectedCategory = catAll;
-                            return;
-                        }
-                    }
                 }
                 filteredEmojis = result;
+
+                if (fullRoot.lastFilterForGroups !== filter || Object.keys(filteredEmojiByGroup).length === 0) {
+                    let groupResult = {};
+                    const cats = ["Smileys & Emotion", "People & Body", "Animals & Nature", "Food & Drink", "Activities", "Travel & Places", "Objects", "Symbols", "Flags"];
+                    for (let i = 0; i < cats.length; i++) {
+                        let catEmojis = emojiByGroup[cats[i]] || [];
+                        if (filter && filter.trim() !== "") {
+                            catEmojis = performFilter(catEmojis, filter);
+                        }
+                        groupResult[cats[i]] = catEmojis;
+                    }
+                    filteredEmojiByGroup = groupResult;
+                    fullRoot.lastFilterForGroups = filter;
+                }
             }
 
             onFilterChanged: updateFilteredEmojis()
@@ -910,7 +935,7 @@ PlasmoidItem {
             }
 
             onEmojiListChanged: {
-                if (fullRoot.selectedCategory === catAll && !fullRoot.searchPlaceholderMessageActive) {
+                if (fullRoot.selectedCategory === "Smileys & Emotion" && !fullRoot.searchPlaceholderMessageActive) {
                     fullRoot.resetSearchPlaceholder();
                 }
             }
@@ -1090,6 +1115,7 @@ PlasmoidItem {
 
 
             function handleEmojiSelected(emoji, isCtrlClick, isShiftClick, isAltClick) {
+                if (!emoji) return;
                 const emojiObj = fullRoot.emojiList.find(e => e.emoji === emoji) || {
                     emoji: emoji,
                     name: "",
@@ -1219,7 +1245,7 @@ PlasmoidItem {
                 if (fullRoot.selectedCategory === catGifs) {
                     return i18n("Search GIFs...");
                 }
-                if (fullRoot.selectedCategory === catAll) {
+                if (fullRoot.selectedCategory !== catFavorites && fullRoot.selectedCategory !== catRecent && fullRoot.selectedCategory !== catEmojiKitchen) {
                     return i18n("Search %1 emojis...", fullRoot.emojiList.length);
                 }
 
@@ -1472,7 +1498,7 @@ PlasmoidItem {
                             activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                             KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? pasteField : null
 
-                            KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenGridView : emojiGridView) : null
+                            KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenGridView : allEmojisView) : null
                             onTextChanged: {
                                 fullRoot.filter = text;
                             }
@@ -1741,11 +1767,13 @@ PlasmoidItem {
                                     id: pinArea
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    acceptedButtons: Qt.LeftButton
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                                     onClicked: {
-                                        plasmoid.configuration.AlwaysOpen = !plasmoid.configuration.AlwaysOpen;
-                                        if (!plasmoid.configuration.KeyboardNavigation) {
-                                            parent.activeFocus = false;
+                                        if (mouse.button === Qt.LeftButton) {
+                                            plasmoid.configuration.AlwaysOpen = !plasmoid.configuration.AlwaysOpen;
+                                            if (!plasmoid.configuration.KeyboardNavigation) {
+                                                parent.activeFocus = false;
+                                            }
                                         }
                                     }
                                     onExited: {
@@ -1864,11 +1892,13 @@ PlasmoidItem {
                                     id: settingsArea
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    acceptedButtons: Qt.LeftButton
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                                     onClicked: {
-                                        fullRoot.openConfigurationDialog();
-                                        if (!plasmoid.configuration.KeyboardNavigation) {
-                                            parent.activeFocus = false;
+                                        if (mouse.button === Qt.LeftButton) {
+                                            fullRoot.openConfigurationDialog();
+                                            if (!plasmoid.configuration.KeyboardNavigation) {
+                                                parent.activeFocus = false;
+                                            }
                                         }
                                     }
                                     onExited: {
@@ -1944,7 +1974,7 @@ PlasmoidItem {
                                 focusPolicy: Qt.StrongFocus
                                 activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
                                 KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? settingsButtonInSidebar : null
-                                KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (categoryListView.count > 0 ? (categoryListView.itemAtIndex(0) ? categoryListView.itemAtIndex(0) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView)) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView)) : null
+                                KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (categoryListView.count > 0 ? (categoryListView.itemAtIndex(0) ? categoryListView.itemAtIndex(0) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : allEmojisView)) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : allEmojisView)) : null
 
                                 onClicked: {
                                     fullRoot.sidebarExpanded = !fullRoot.sidebarExpanded;
@@ -2079,7 +2109,7 @@ PlasmoidItem {
                                     focusPolicy: Qt.StrongFocus
                                     activeFocusOnTab: plasmoid.configuration.KeyboardNavigation
 
-                                    KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (index + 1 < categoryListView.count ? (categoryListView.itemAtIndex(index + 1) ? categoryListView.itemAtIndex(index + 1) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? slot1 : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView))) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? slot1 : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : emojiGridView))) : null
+                                    KeyNavigation.tab: plasmoid.configuration.KeyboardNavigation ? (index + 1 < categoryListView.count ? (categoryListView.itemAtIndex(index + 1) ? categoryListView.itemAtIndex(index + 1) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? slot1 : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : allEmojisView))) : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? slot1 : (fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? kitchenView.kitchenGridView : allEmojisView))) : null
                                     KeyNavigation.backtab: plasmoid.configuration.KeyboardNavigation ? (index === 0 ? sidebarToggleButton : (categoryListView.itemAtIndex(index - 1) ? categoryListView.itemAtIndex(index - 1) : sidebarToggleButton)) : null
 
                                     Keys.onReturnPressed: clicked()
@@ -2094,13 +2124,13 @@ PlasmoidItem {
                                             anchors.fill: parent
                                             color: Kirigami.Theme.highlightColor
                                             radius: 4
-                                            opacity: (fullRoot.selectedCategory === model.name || fullRoot.draggedCategoryIndex === index || dragArea.pressed) ? 1.0 : (((dragArea.containsMouse && !fullRoot.selectedCategory === model.name && !fullRoot.isAnyCategoryDragging) || categoryButton.activeFocus) ? 0.2 : 0)
+                                            opacity: (fullRoot.selectedCategory === model.name || fullRoot.draggedCategoryIndex === index || dragArea.pressed) ? 1.0 : (((dragArea.containsMouse && fullRoot.selectedCategory !== model.name && !fullRoot.isAnyCategoryDragging) || categoryButton.activeFocus) ? 0.2 : 0)
                                         }
                                         Rectangle {
                                             anchors.fill: parent
                                             color: "transparent"
                                             radius: 4
-                                            border.width: ((fullRoot.selectedCategory === model.name || dragArea.pressed || fullRoot.draggedCategoryIndex === index) || (dragArea.containsMouse && !fullRoot.selectedCategory === model.name && !fullRoot.isAnyCategoryDragging) || categoryButton.activeFocus) ? 2 : 0
+                                            border.width: ((fullRoot.selectedCategory === model.name || dragArea.pressed || fullRoot.draggedCategoryIndex === index) || (dragArea.containsMouse && fullRoot.selectedCategory !== model.name && !fullRoot.isAnyCategoryDragging) || categoryButton.activeFocus) ? 2 : 0
                                             border.color: Kirigami.Theme.highlightColor
                                         }
                                     }
@@ -2197,6 +2227,11 @@ PlasmoidItem {
                                                 mouse.accepted = true;
                                             } else if (fullRoot.draggedCategoryIndex !== index) {
                                                 fullRoot.selectedCategory = model.name;
+                                                if (model.name !== fullRoot.catFavorites && model.name !== fullRoot.catRecent && model.name !== fullRoot.catGifs && model.name !== fullRoot.catEmojiKitchen) {
+                                                    if (typeof allEmojisView !== "undefined") {
+                                                        allEmojisView.scrollToCategory(model.name);
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -3142,21 +3177,29 @@ PlasmoidItem {
 
                                 PC3.ItemDelegate {
                                     id: delegateItem
+                                    property var itemData: {
+                                        if (typeof modelData !== "undefined" && modelData) return modelData;
+                                        if (typeof model !== "undefined" && model) return model;
+                                        return {};
+                                    }
                                     width: masonryRow.columnWidth
-                                    height: Math.floor(width / (model.aspectRatio || 1.0))
+                                    height: Math.floor(width / (itemData.aspectRatio || 1.0))
 
                                     readonly property bool inView: {
                                         if (!fullRoot.isWidgetExpanded)
                                         return false;
-                                        if (typeof gifFlickable === "undefined" || !gifFlickable)
+                                        if (typeof gifFlickable === "undefined" || !gifFlickable || !gifFlickable.contentItem)
                                         return false;
-                                        var dummy = gifFlickable.contentY + gifFlickable.height;
-                                        var absY = y + parent.y + masonryRow.y;
+                                        if (!delegateItem.parent)
+                                        return false;
+                                        var dummy = gifFlickable.contentY + gifFlickable.height + gifFlickable.contentHeight;
+                                        var absPos = delegateItem.mapToItem(gifFlickable.contentItem, 0, 0);
+                                        var absY = absPos ? absPos.y : 0;
                                         return (absY + height >= gifFlickable.contentY - 200) && (absY <= gifFlickable.contentY + gifFlickable.height + 200);
                                     }
 
                                     onClicked: {
-                                        gifView.copyGif(model.rawUrl, model.title, model.webpUrl, model.previewUrl, model.aspectRatio);
+                                        gifView.copyGif(itemData.rawUrl, itemData.title, itemData.webpUrl, itemData.previewUrl, itemData.aspectRatio);
                                         if (plasmoid.configuration.CloseAfterSelection) {
                                             if (fullRoot.plasmoidItem)
                                             fullRoot.plasmoidItem.expanded = false;
@@ -3168,10 +3211,10 @@ PlasmoidItem {
                                         cursorShape: Qt.PointingHandCursor
                                         onHoveredChanged: {
                                             if (hovered) {
-                                                fullRoot.hoveredGifTitle = model.title;
-                                                fullRoot.hoveredGifUrl = model.previewUrl;
+                                                fullRoot.hoveredGifTitle = itemData.title;
+                                                fullRoot.hoveredGifUrl = itemData.previewUrl;
                                             } else {
-                                                if (fullRoot.hoveredGifUrl === model.previewUrl) {
+                                                if (fullRoot.hoveredGifUrl === itemData.previewUrl) {
                                                     fullRoot.hoveredGifTitle = "";
                                                     fullRoot.hoveredGifUrl = "";
                                                 }
@@ -3184,7 +3227,7 @@ PlasmoidItem {
                                         anchors.right: parent.right
                                         anchors.margins: 6
                                         icon.name: fullRoot.isFavoriteItem("gif", {
-                                            rawUrl: model.rawUrl
+                                            rawUrl: itemData.rawUrl
                                         }) ? "bookmarks-bookmarked" : "bookmarks"
                                         visible: gifDelegateHover.hovered
                                         width: 28
@@ -3200,11 +3243,11 @@ PlasmoidItem {
 
                                         onClicked: {
                                             fullRoot.toggleFavoriteItem("gif", {
-                                                rawUrl: model.rawUrl,
-                                                title: model.title,
-                                                webpUrl: model.webpUrl || model.rawUrl,
-                                                previewUrl: model.previewUrl,
-                                                aspectRatio: model.aspectRatio
+                                                rawUrl: itemData.rawUrl,
+                                                title: itemData.title,
+                                                webpUrl: itemData.webpUrl || itemData.rawUrl,
+                                                previewUrl: itemData.previewUrl,
+                                                aspectRatio: itemData.aspectRatio
                                             });
                                         }
                                     }
@@ -3219,7 +3262,7 @@ PlasmoidItem {
 
                                         AnimatedImage {
                                             id: gifImage
-                                            source: delegateItem.inView ? model.previewUrl : ""
+                                            source: delegateItem.inView ? itemData.previewUrl : ""
                                             anchors.fill: parent
                                             anchors.margins: gifDelegateHover.hovered ? 1 : 2
                                             fillMode: Image.Stretch
@@ -3239,9 +3282,9 @@ PlasmoidItem {
                                 anchors.bottomMargin: 0
                                 anchors.rightMargin: 0
                                 contentWidth: width
-                                contentHeight: Math.max(col0.childrenRect.height, col1.childrenRect.height, col2.childrenRect.height) + (gifView.isLoadingMore ? 48 : 20)
+                                contentHeight: gifLayout.height + (gifView.isLoadingMore ? 48 : 20)
                                 clip: true
-                                visible: !gifView.isLoading && !gifSearchTimer.running && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0)
+                                visible: !gifView.isLoading && !gifSearchTimer.running && (gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0 || fullRoot.favoriteEmojis.filter(e => e.type === "gif").length > 0 || fullRoot.recentEmojis.filter(e => e.type === "gif").length > 0)
 
                                 ScrollBar.vertical: ScrollBar {}
 
@@ -3262,22 +3305,149 @@ PlasmoidItem {
                                     }
                                 }
 
-                                Row {
-                                    id: masonryRow
-                                    anchors.top: parent.top
-                                    anchors.topMargin: 4
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: (gifFlickable.ScrollBar.vertical && gifFlickable.ScrollBar.vertical.visible) ? gifFlickable.ScrollBar.vertical.width : 4
-                                    spacing: 6
 
-                                    readonly property int numColumns: width > 360 ? 3 : 2
+                                Column {
+                                    id: gifLayout
+                                    width: gifFlickable.width - ((gifFlickable.ScrollBar.vertical && gifFlickable.ScrollBar.vertical.visible) ? gifFlickable.ScrollBar.vertical.width : 0)
+                                    spacing: 12
+
+                                    Repeater {
+                                        model: ["Favorites", "Recent"]
+                                        delegate: Column {
+                                            id: parentCatLayout
+                                            width: parent.width
+                                            spacing: 8
+                                            property string catName: modelData
+                                            property var catGifs: {
+                                                let list = catName === "Favorites" 
+                                                    ? fullRoot.favoriteEmojis.filter(e => e.type === "gif")
+                                                    : fullRoot.recentEmojis.filter(e => e.type === "gif").slice(0, 36);
+                                                
+                                                if (fullRoot.filter && fullRoot.filter.trim() !== "") {
+                                                    return performFilter(list, fullRoot.filter);
+                                                }
+                                                return list;
+                                            }
+                                            visible: catGifs.length > 0
+
+                                            Item {
+                                                id: catHeader
+                                                width: parent.width
+                                                height: 32
+                                                property bool isExpanded: true
+
+                                                Rectangle {
+                                                    anchors.fill: parent
+                                                    color: Kirigami.Theme.highlightColor
+                                                    opacity: catHeaderMouse.containsMouse ? 0.1 : 0
+                                                    radius: 4
+                                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                                                }
+
+                                                RowLayout {
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: 4
+                                                    anchors.rightMargin: 4
+                                                    spacing: 8
+
+                                                    Item {
+                                                        implicitWidth: 16
+                                                        implicitHeight: 16
+                                                        Kirigami.Icon {
+                                                            anchors.centerIn: parent
+                                                            source: catHeader.isExpanded ? "go-down" : "go-next"
+                                                            width: 16
+                                                            height: 16
+                                                        }
+                                                    }
+
+                                                    PlasmaComponents.Label {
+                                                        text: catName === "Favorites" ? i18n("Favorites") : i18n("Recent")
+                                                        font.bold: true
+                                                        font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                                    }
+
+                                                    Rectangle {
+                                                        width: catCountLabel.contentWidth + 12
+                                                        height: 18
+                                                        radius: 9
+                                                        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
+
+                                                        PlasmaComponents.Label {
+                                                            id: catCountLabel
+                                                            anchors.centerIn: parent
+                                                            text: catGifs.length
+                                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                                            font.bold: true
+                                                            color: Kirigami.Theme.highlightColor
+                                                        }
+                                                    }
+
+                                                    Kirigami.Separator {
+                                                        Layout.fillWidth: true
+                                                        opacity: 0.3
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: catHeaderMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: catHeader.isExpanded = !catHeader.isExpanded
+                                                }
+                                            }
+
+                                            Row {
+                                                id: catRow
+                                                width: parent.width
+                                                spacing: 6
+                                                visible: catHeader.isExpanded
+                                                
+                                                readonly property int numCols: masonryRow.numColumns
+                                                readonly property int colWidth: masonryRow.columnWidth
+
+                                                Repeater {
+                                                    model: parent.numCols
+                                                    delegate: Column {
+                                                        spacing: 6
+                                                        width: parent.colWidth
+                                                        property int colIndex: index
+                                                        Repeater {
+                                                            property var sourceArray: parentCatLayout.catGifs
+                                                            model: {
+                                                                let colItems = [];
+                                                                let arr = sourceArray;
+                                                                let cCols = catRow.numCols;
+                                                                let cIdx = colIndex;
+                                                                if (!arr || !cCols) return colItems;
+                                                                for (let i = 0; i < arr.length; i++) {
+                                                                    if (i % cCols === cIdx) colItems.push(arr[i]);
+                                                                }
+                                                                return colItems;
+                                                            }
+                                                            delegate: gifDelegate
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Row {
+                                        id: masonryRow
+                                        width: parent.width
+                                        spacing: 6
+                                        visible: gifCol0Model.count > 0 || gifCol1Model.count > 0 || gifCol2Model.count > 0
+
+                                        readonly property int numColumns: width > 360 ? 3 : 2
                                     readonly property int columnWidth: Math.floor((width - (numColumns - 1) * spacing) / numColumns)
 
                                     Column {
                                         id: col0
                                         spacing: 6
                                         width: masonryRow.columnWidth
+                                        property real baseY: parent.y
                                         anchors.top: parent.top
 
                                         Repeater {
@@ -3290,6 +3460,7 @@ PlasmoidItem {
                                         id: col1
                                         spacing: 6
                                         width: masonryRow.columnWidth
+                                        property real baseY: parent.y
                                         anchors.top: parent.top
 
                                         Repeater {
@@ -3302,6 +3473,7 @@ PlasmoidItem {
                                         id: col2
                                         spacing: 6
                                         width: masonryRow.columnWidth
+                                        property real baseY: parent.y
                                         visible: masonryRow.numColumns === 3
                                         anchors.top: parent.top
 
@@ -3312,391 +3484,262 @@ PlasmoidItem {
                                     }
                                 }
 
-                                PlasmaComponents.BusyIndicator {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    y: Math.max(col0.childrenRect.height, col1.childrenRect.height, col2.childrenRect.height) + 12
-                                    running: gifView.isLoadingMore
-                                    visible: gifView.isLoadingMore
-                                    width: 24
-                                    height: 24
+                                    PlasmaComponents.BusyIndicator {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        running: gifView.isLoadingMore
+                                        visible: gifView.isLoadingMore
+                                        width: 24
+                                        height: 24
+                                    }
                                 }
                             }
                         }
 
-                        RowLayout {
+                        ScrollView {
+                            id: allEmojisView
                             anchors.fill: parent
-                            spacing: 0
                             visible: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen && fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.selectedCategory !== fullRoot.catFavorites && fullRoot.selectedCategory !== fullRoot.catRecent
+                            clip: true
 
-                            GridView {
-                                id: emojiGridView
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                cellWidth: fullRoot.internalGridSize
-                                cellHeight: fullRoot.internalGridSize
-                                rightMargin: ScrollBar.vertical.visible ? ScrollBar.vertical.width : 0
-                                model: fullRoot.filteredEmojis
-                                clip: true
-                                interactive: false
-                                flickableDirection: Flickable.VerticalFlick
-                                ScrollBar.vertical: ScrollBar {}
+                            property var categoryStates: ({})
 
-                                activeFocusOnTab: fullRoot.emojiKeyboardNavigationEnabled
-                                keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
-                                keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
-
-                                HoverHandler {
-                                    id: gridHoverHandler
-                                    onHoveredChanged: {
-                                        fullRoot.gridIsMouseOver = hovered;
-                                        if (!hovered && fullRoot.emojiHoveredEmojiKey !== "") {
-                                            fullRoot.emojiLastHoveredEmojiKey = fullRoot.emojiHoveredEmojiKey;
-                                            fullRoot.emojiHoveredEmojiKey = "";
-                                            fullRoot.hoveredEmojiName = "";
+                            Connections {
+                                target: allEmojisView.contentItem
+                                function onContentYChanged() {
+                                    if (!allEmojisView.visible || scrollTimer.running) return;
+                                    let currentY = allEmojisView.contentItem.contentY;
+                                    let activeCat = "";
+                                    for (let i = 0; i < allEmojisRepeater.count; i++) {
+                                        let item = allEmojisRepeater.itemAt(i);
+                                        // 40px offset: if the header is slightly below the top edge, consider it active
+                                        if (item && item.visible && item.y <= currentY + 40) {
+                                            activeCat = item.catName;
+                                        }
+                                    }
+                                    if (activeCat !== "" && fullRoot.selectedCategory !== activeCat) {
+                                        if (activeCat !== "Favorites" && activeCat !== "Recent") {
+                                            fullRoot.selectedCategory = activeCat;
                                         }
                                     }
                                 }
+                            }
 
-                                WheelHandler {
-                                    id: gridWheelHandler
-                                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                                    onWheel: function (event) {
-                                        const step = fullRoot.internalGridSize * 3;
-                                        const delta = event.angleDelta.y;
-                                        const newY = emojiGridView.contentY - (delta / 120) * step;
-                                        emojiGridView.contentY = Math.max(0, Math.min(emojiGridView.contentHeight - emojiGridView.height, newY));
-                                        event.accepted = true;
+                            function toggleCategory(catName) {
+                                let states = Object.assign({}, categoryStates);
+                                states[catName] = !(states[catName] !== false);
+                                categoryStates = states;
+                            }
+
+                            Timer {
+                                id: scrollTimer
+                                interval: 50
+                                property var targetItem: null
+                                onTriggered: {
+                                    if (targetItem && allEmojisView.contentItem) {
+                                        let targetY = targetItem.y;
+                                        let maxContentY = allEmojisLayout.height - allEmojisView.height;
+                                        allEmojisView.contentItem.contentY = Math.max(0, Math.min(targetY, maxContentY));
                                     }
                                 }
+                            }
 
-                                MouseArea {
-                                    id: lassoOverlay
-                                    anchors.fill: parent
-                                    hoverEnabled: false
-                                    acceptedButtons: Qt.LeftButton
-
-                                    property real lastLassoX: -1
-                                    property real lastLassoY: -1
-                                    property bool lassoMoved: false
-
-                                    function selectAtPos(mx, my) {
-                                        const idx = emojiGridView.indexAt(mx, my + emojiGridView.contentY);
-                                        if (idx < 0 || idx >= fullRoot.filteredEmojis.length)
-                                        return;
-                                        const item = fullRoot.filteredEmojis[idx];
-                                        if (!item || !!fullRoot.selectedEmojiSet[item.emoji])
-                                        return;
-                                        fullRoot.selectedEmojis.push(item.emoji);
-                                        fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice();
-                                        const newSet = {};
-                                        for (const e of fullRoot.selectedEmojis)
-                                        newSet[e] = true;
-                                        fullRoot.selectedEmojiSet = newSet;
-                                        pasteField.placeholderText = i18n("Selected %1 emoji(s)", fullRoot.selectedEmojis.length);
-                                        fullRoot.emojiHoveredEmojiKey = item.emoji;
-                                        fullRoot.hoveredEmojiName = item.name;
+                            function scrollToCategory(catName) {
+                                for (let i = 0; i < allEmojisRepeater.count; i++) {
+                                    let item = allEmojisRepeater.itemAt(i);
+                                    if (item && item.catName === catName) {
+                                        // Scroll view needs to update contentY. We ensure it's expanded.
+                                        let states = Object.assign({}, categoryStates);
+                                        states[catName] = true;
+                                        categoryStates = states;
+                                        
+                                        scrollTimer.targetItem = item;
+                                        scrollTimer.restart();
+                                        break;
                                     }
+                                }
+                            }
 
-                                    function selectAlongPath(x1, y1, x2, y2) {
-                                        const step = Math.max(4, fullRoot.internalGridSize * 0.4);
-                                        const dx = x2 - x1;
-                                        const dy = y2 - y1;
-                                        const dist = Math.sqrt(dx * dx + dy * dy);
-                                        const steps = Math.ceil(dist / step);
-                                        for (let i = 0; i <= steps; i++) {
-                                            const t = steps === 0 ? 1 : i / steps;
-                                            selectAtPos(x1 + dx * t, y1 + dy * t);
+                            Column {
+                                id: allEmojisLayout
+                                width: allEmojisView.width - (allEmojisView.ScrollBar.vertical.visible ? allEmojisView.ScrollBar.vertical.width : 0)
+                                spacing: 16
+
+                                Repeater {
+                                    id: allEmojisRepeater
+                                    model: ["Favorites", "Recent", "Smileys & Emotion", "People & Body", "Animals & Nature", "Food & Drink", "Activities", "Travel & Places", "Objects", "Symbols", "Flags"]
+                                    delegate: Column {
+                                        width: parent.width
+                                        spacing: 8
+                                        property string catName: modelData
+                                        property var catEmojis: {
+                                            let sourceList = [];
+                                            if (catName === "Favorites") sourceList = fullRoot.favoriteEmojis || [];
+                                            else if (catName === "Recent") sourceList = (fullRoot.recentEmojis || []).slice(0, 36);
+                                            else sourceList = fullRoot.filteredEmojiByGroup[modelData] || [];
+                                            
+                                            if ((catName === "Favorites" || catName === "Recent") && fullRoot.filter && fullRoot.filter.trim() !== "") {
+                                                return performFilter(sourceList, fullRoot.filter);
+                                            }
+                                            return sourceList;
                                         }
-                                    }
+                                        visible: catEmojis.length > 0
 
-                                    onPressed: {
-                                        if (mouse.modifiers & Qt.ControlModifier) {
-                                            fullRoot.ctrlDragSelectActive = true;
-                                            lastLassoX = mouse.x;
-                                            lastLassoY = mouse.y;
-                                            lassoMoved = false;
-                                        } else {
-                                            mouse.accepted = false;
-                                        }
-                                    }
+                                        Item {
+                                            id: catHeader
+                                            width: parent.width
+                                            height: 32
 
-                                    onPositionChanged: {
-                                        if (!fullRoot.ctrlDragSelectActive)
-                                        return;
-                                        if (!(mouse.buttons & Qt.LeftButton)) {
-                                            fullRoot.ctrlDragSelectActive = false;
-                                            lastLassoX = -1;
-                                            lastLassoY = -1;
-                                            lassoMoved = false;
-                                            return;
-                                        }
-                                        lassoMoved = true;
-                                        selectAlongPath(lastLassoX, lastLassoY, mouse.x, mouse.y);
-                                        lastLassoX = mouse.x;
-                                        lastLassoY = mouse.y;
-                                    }
+                                            property bool isExpanded: allEmojisView.categoryStates[catName] !== false
 
-                                    onClicked: {
-                                        if (!lassoMoved) {
-                                            const idx = emojiGridView.indexAt(mouse.x, mouse.y + emojiGridView.contentY);
-                                            if (idx >= 0 && idx < fullRoot.filteredEmojis.length) {
-                                                const item = fullRoot.filteredEmojis[idx];
-                                                handleEmojiSelected(item.emoji, true, false, false);
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                color: Kirigami.Theme.highlightColor
+                                                opacity: catHeaderMouse.containsMouse ? 0.1 : 0
+                                                radius: 4
+                                                Behavior on opacity {
+                                                    NumberAnimation {
+                                                        duration: 150
+                                                    }
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.leftMargin: 8
+                                                anchors.rightMargin: 8
+                                                spacing: 8
+
+                                                Item {
+                                                    implicitWidth: 16
+                                                    implicitHeight: 16
+                                                    Kirigami.Icon {
+                                                        anchors.centerIn: parent
+                                                        source: catHeader.isExpanded ? "go-down" : "go-next"
+                                                        width: 16
+                                                        height: 16
+                                                    }
+                                                }
+
+                                                PlasmaComponents.Label {
+                                                    text: catName
+                                                    font.bold: true
+                                                    font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                                }
+
+                                                Rectangle {
+                                                    width: catCountLabel.contentWidth + 12
+                                                    height: 18
+                                                    radius: 9
+                                                    color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
+
+                                                    PlasmaComponents.Label {
+                                                        id: catCountLabel
+                                                        anchors.centerIn: parent
+                                                        text: catEmojis.length
+                                                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                                        font.bold: true
+                                                        color: Kirigami.Theme.highlightColor
+                                                    }
+                                                }
+
+                                                Kirigami.Separator {
+                                                    Layout.fillWidth: true
+                                                    opacity: 0.3
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: catHeaderMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    let currentlyExpanded = allEmojisView.categoryStates[catName] !== false;
+                                                    allEmojisView.toggleCategory(catName);
+                                                    if (!currentlyExpanded) {
+                                                        allEmojisView.scrollToCategory(catName);
+                                                    }
+                                                }
                                             }
                                         }
-                                    }
 
-                                    onReleased: {
-                                        fullRoot.ctrlDragSelectActive = false;
-                                        lastLassoX = -1;
-                                        lastLassoY = -1;
-                                        lassoMoved = false;
-                                    }
-                                }
+                                        Flow {
+                                            width: parent.width
+                                            spacing: 0
+                                            visible: catHeader.isExpanded
 
-                                function triggerExternalFeedback() {
-                                    fullRoot.gridExternalKeyboardActionPressed = true;
-                                }
+                                            Repeater {
+                                                model: catEmojis
 
-                                function cancelExternalFeedback() {
-                                    fullRoot.gridExternalKeyboardActionPressed = false;
-                                }
+                                                delegate: Item {
+                                                    width: fullRoot.internalGridSize
+                                                    height: fullRoot.internalGridSize
 
-                                function updateKeyboardHover() {
-                                    if (!fullRoot.emojiKeyboardNavigationEnabled)
-                                    return;
-                                    if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                        const item = fullRoot.filteredEmojis[currentIndex];
-                                        if (item) {
-                                            if (fullRoot.emojiHoveredEmojiKey !== item.emoji) {
-                                                fullRoot.emojiHoveredEmojiKey = item.emoji;
-                                                fullRoot.hoveredEmojiName = item.name;
-                                            }
-                                            if (fullRoot.emojiLastHoveredEmojiKey !== item.emoji) {
-                                                fullRoot.emojiLastHoveredEmojiKey = item.emoji;
-                                            }
-                                        }
-                                    }
-                                }
+                                                    Item {
+                                                        anchors.fill: parent
+                                                        anchors.margins: 2
 
-                                function clearKeyboardHover() {
-                                    if (fullRoot.emojiHoveredEmojiKey !== "") {
-                                        fullRoot.emojiHoveredEmojiKey = "";
-                                        fullRoot.hoveredEmojiName = "";
-                                    }
-                                }
+                                                        Rectangle {
+                                                            anchors.fill: parent
+                                                            color: Kirigami.Theme.highlightColor
+                                                            radius: 4
+                                                            opacity: mouseArea.pressed ? 1.0 : (mouseArea.containsMouse ? 0.2 : 0)
+                                                        }
 
-                                Keys.onPressed: function (event) {
-                                    if (!fullRoot.emojiKeyboardNavigationEnabled)
-                                    return;
-                                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select) {
-                                        if (event.modifiers & Qt.ControlModifier) {
-                                            if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                                const item = fullRoot.filteredEmojis[currentIndex];
-                                                handleEmojiSelected(item.emoji, true, false, false);
-                                            }
-                                            event.accepted = true;
-                                        } else {
-                                            fullRoot.keyboardPressedIndex = currentIndex;
-                                            fullRoot.gridKeyboardActionPressed = true;
-                                            event.accepted = true;
-                                        }
-                                    } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right || event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
-                                        if (event.modifiers & Qt.ControlModifier) {
-                                            fullRoot.ctrlDragSelectActive = true;
-                                        }
-                                    } else if (event.key === Qt.Key_Space) {
-                                        if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                            const item = fullRoot.filteredEmojis[currentIndex];
-                                            fullRoot.emojiHoveredEmojiKey = item.emoji;
-                                            fullRoot.hoveredEmojiName = item.name;
-                                        }
-                                        event.accepted = true;
-                                    } else if (event.key === Qt.Key_Escape) {
-                                        handleEscapePressed();
-                                        event.accepted = true;
-                                    } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                                        const backwards = (event.key === Qt.Key_Backtab) || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier));
-                                        if (!backwards && fullRoot.emojiTabNextTarget) {
-                                            fullRoot.emojiTabNextTarget.forceActiveFocus();
-                                            event.accepted = true;
-                                        } else if (backwards && fullRoot.emojiTabPreviousTarget) {
-                                            fullRoot.emojiTabPreviousTarget.forceActiveFocus();
-                                            event.accepted = true;
-                                        }
-                                    }
-                                }
+                                                        Rectangle {
+                                                            anchors.fill: parent
+                                                            color: "transparent"
+                                                            radius: 4
+                                                            border.width: (mouseArea.pressed || mouseArea.containsMouse) ? 2 : 0
+                                                            border.color: Kirigami.Theme.highlightColor
+                                                        }
+                                                    }
 
-                                Keys.onReleased: function (event) {
-                                    if (!(event.modifiers & Qt.ControlModifier)) {
-                                        fullRoot.ctrlDragSelectActive = false;
-                                    }
-                                    if (fullRoot.emojiKeyboardNavigationEnabled && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Select)) {
-                                        if (!(event.modifiers & Qt.ControlModifier)) {
-                                            fullRoot.gridKeyboardActionPressed = false;
-                                            fullRoot.keyboardPressedIndex = -1;
-                                            if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                                const item = fullRoot.filteredEmojis[currentIndex];
-                                                const isShift = event.modifiers & Qt.ShiftModifier;
-                                                const isAlt = event.modifiers & Qt.AltModifier;
-                                                handleEmojiSelected(item.emoji, false, isShift, isAlt);
-                                            }
-                                            event.accepted = true;
-                                        }
-                                    }
-                                }
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: modelData.emoji
+                                                        font.pixelSize: Math.floor(fullRoot.internalGridSize * 0.7)
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                        verticalAlignment: Text.AlignVCenter
+                                                        renderType: Text.NativeRendering
+                                                    }
 
-                                onActiveFocusChanged: {
-                                    if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
-                                        if (count > 0) {
-                                            if (currentIndex < 0 || currentIndex >= count) {
-                                                if (fullRoot.emojiHoveredEmojiKey) {
-                                                    for (var i = 0; i < fullRoot.filteredEmojis.length; i++) {
-                                                        if (fullRoot.filteredEmojis[i].emoji === fullRoot.emojiHoveredEmojiKey) {
-                                                            currentIndex = i;
-                                                            break;
+                                                    MouseArea {
+                                                        id: mouseArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+                                                        onEntered: {
+                                                            fullRoot.emojiHoveredEmojiKey = modelData.emoji;
+                                                            fullRoot.hoveredEmojiName = modelData.name;
+                                                        }
+
+                                                        onExited: {
+                                                            if (fullRoot.emojiHoveredEmojiKey === modelData.emoji) {
+                                                                fullRoot.emojiLastHoveredEmojiKey = modelData.emoji;
+                                                            }
+                                                        }
+
+                                                        onClicked: function (mouse) {
+                                                            if (mouse.button === Qt.LeftButton) {
+                                                                const isCtrl = mouse.modifiers & Qt.ControlModifier;
+                                                                const isShift = mouse.modifiers & Qt.ShiftModifier;
+                                                                const isAlt = mouse.modifiers & Qt.AltModifier;
+                                                                handleEmojiSelected(modelData.emoji, isCtrl, isShift, isAlt);
+                                                            } else if (mouse.button === Qt.RightButton) {
+                                                                var globalPos = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y);
+                                                                handleEmojiRightClicked(modelData.emoji, modelData, globalPos);
+                                                            }
+                                                        }
+
+                                                        onPressAndHold: function (mouse) {
+                                                            var globalPos = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y);
+                                                            handleEmojiRightClicked(modelData.emoji, modelData, globalPos);
                                                         }
                                                     }
                                                 }
-                                                if (currentIndex < 0)
-                                                currentIndex = 0;
-                                            } else {
-                                                updateKeyboardHover();
                                             }
-                                        }
-                                    } else if (!activeFocus) {
-                                        if (!fullRoot.gridIsMouseOver) {
-                                            clearKeyboardHover();
-                                        }
-                                    }
-                                }
-
-                                onModelChanged: {
-                                    if (fullRoot.emojiKeyboardNavigationEnabled) {
-                                        if (count > 0 && activeFocus) {
-                                            if (currentIndex < 0 || currentIndex >= count) {
-                                                if (fullRoot.emojiHoveredEmojiKey) {
-                                                    for (var i = 0; i < fullRoot.filteredEmojis.length; i++) {
-                                                        if (fullRoot.filteredEmojis[i].emoji === fullRoot.emojiHoveredEmojiKey) {
-                                                            currentIndex = i;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                                if (currentIndex < 0)
-                                                currentIndex = 0;
-                                            } else {
-                                                updateKeyboardHover();
-                                            }
-                                        } else if (count === 0) {
-                                            clearKeyboardHover();
-                                        }
-                                    }
-                                }
-
-                                onCountChanged: {
-                                    if (count === 0) {
-                                        clearKeyboardHover();
-                                    } else if (currentIndex >= count) {
-                                        currentIndex = count - 1;
-                                    }
-                                }
-
-                                onCurrentIndexChanged: {
-                                    if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
-                                        updateKeyboardHover();
-                                        if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                            const item = fullRoot.filteredEmojis[currentIndex];
-                                            if (item) {
-                                                fullRoot.emojiLastHoveredEmojiKey = item.emoji;
-                                            }
-                                        }
-                                    }
-                                    if (fullRoot.emojiKeyboardNavigationEnabled && fullRoot.ctrlDragSelectActive) {
-                                        if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                            const lassoItem = fullRoot.filteredEmojis[currentIndex];
-                                            if (lassoItem && !!!fullRoot.selectedEmojiSet[lassoItem.emoji]) {
-                                                fullRoot.selectedEmojis.push(lassoItem.emoji);
-                                                fullRoot.selectedEmojis = fullRoot.selectedEmojis.slice();
-                                                const newSet = {};
-                                                for (const e of fullRoot.selectedEmojis)
-                                                newSet[e] = true;
-                                                fullRoot.selectedEmojiSet = newSet;
-                                                pasteField.placeholderText = i18n("Selected %1 emoji(s)", fullRoot.selectedEmojis.length);
-                                            }
-                                        }
-                                    }
-                                }
-
-                                delegate: Item {
-                                    width: fullRoot.internalGridSize
-                                    height: fullRoot.internalGridSize
-
-                                    Item {
-                                        anchors.fill: parent
-                                        anchors.margins: 2
-
-                                        Rectangle {
-                                            anchors.fill: parent
-                                            color: Kirigami.Theme.highlightColor
-                                            radius: 4
-                                            opacity: (mouseArea.pressed || (emojiGridView.activeFocus && GridView.isCurrentItem && fullRoot.gridKeyboardActionPressed)) ? 1.0 : (mouseArea.containsMouse || (emojiGridView.activeFocus && ((GridView.isCurrentItem && emojiGridView.activeFocus) || (fullRoot.emojiLastHoveredEmojiKey === modelData.emoji && !fullRoot.gridIsMouseOver)))) ? 0.2 : 0
-                                        }
-
-                                        Rectangle {
-                                            anchors.fill: parent
-                                            color: "transparent"
-                                            radius: 4
-                                            border.width: (mouseArea.pressed || (emojiGridView.activeFocus && GridView.isCurrentItem && fullRoot.gridKeyboardActionPressed) || mouseArea.containsMouse || (emojiGridView.activeFocus && ((GridView.isCurrentItem && emojiGridView.activeFocus) || (fullRoot.emojiLastHoveredEmojiKey === modelData.emoji && !fullRoot.gridIsMouseOver)))) ? 2 : 0
-                                            border.color: Kirigami.Theme.highlightColor
-                                        }
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: modelData.emoji
-                                        font.pixelSize: Math.floor(fullRoot.internalGridSize * 0.7)
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        renderType: Text.NativeRendering
-                                    }
-
-                                    MouseArea {
-                                        id: mouseArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-                                        onEntered: {
-                                            fullRoot.emojiHoveredEmojiKey = modelData.emoji;
-                                            fullRoot.hoveredEmojiName = modelData.name;
-
-                                            if (emojiGridView && fullRoot.emojiKeyboardNavigationEnabled) {
-                                                emojiGridView.currentIndex = index;
-                                            }
-                                        }
-
-                                        onExited: {
-                                            if (fullRoot.emojiHoveredEmojiKey === modelData.emoji) {
-                                                fullRoot.emojiLastHoveredEmojiKey = modelData.emoji;
-                                            }
-                                        }
-
-                                        onClicked: {
-                                            if (mouse.button === Qt.LeftButton) {
-                                                const isCtrl = mouse.modifiers & Qt.ControlModifier;
-                                                const isShift = mouse.modifiers & Qt.ShiftModifier;
-                                                const isAlt = mouse.modifiers & Qt.AltModifier;
-                                                handleEmojiSelected(modelData.emoji, isCtrl, isShift, isAlt);
-                                            } else if (mouse.button === Qt.RightButton) {
-                                                var globalPos = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y);
-                                                handleEmojiRightClicked(modelData.emoji, modelData, globalPos);
-                                            }
-                                        }
-
-                                        onPressAndHold: {
-                                            var globalPos = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y);
-                                            handleEmojiRightClicked(modelData.emoji, modelData, globalPos);
                                         }
                                     }
                                 }
@@ -3708,12 +3751,12 @@ PlasmoidItem {
 
                             PC3.ItemDelegate {
                                 id: favRecDelegateItem
-                                readonly property var modelData: model
+                                property var itemData: model
                                 width: favRecentsMasonryRow.columnWidth
-                                height: Math.floor(width / (modelData.aspectRatio || 1.0))
+                                height: Math.floor(width / (itemData.aspectRatio || 1.0))
 
                                 onClicked: {
-                                    gifView.copyGif(modelData.rawUrl, modelData.title, modelData.webpUrl, modelData.previewUrl, modelData.aspectRatio || 1.0);
+                                    gifView.copyGif(itemData.rawUrl, itemData.title, itemData.webpUrl, itemData.previewUrl, itemData.aspectRatio || 1.0);
                                     if (plasmoid.configuration.CloseAfterSelection) {
                                         if (fullRoot.plasmoidItem)
                                         fullRoot.plasmoidItem.expanded = false;
@@ -3725,10 +3768,10 @@ PlasmoidItem {
                                     cursorShape: Qt.PointingHandCursor
                                     onHoveredChanged: {
                                         if (hovered) {
-                                            fullRoot.hoveredGifTitle = modelData.title;
-                                            fullRoot.hoveredGifUrl = modelData.previewUrl;
+                                            fullRoot.hoveredGifTitle = itemData.title;
+                                            fullRoot.hoveredGifUrl = itemData.previewUrl;
                                         } else {
-                                            if (fullRoot.hoveredGifUrl === modelData.previewUrl) {
+                                            if (fullRoot.hoveredGifUrl === itemData.previewUrl) {
                                                 fullRoot.hoveredGifTitle = "";
                                                 fullRoot.hoveredGifUrl = "";
                                             }
@@ -3741,7 +3784,7 @@ PlasmoidItem {
                                     anchors.right: parent.right
                                     anchors.margins: 6
                                     icon.name: fullRoot.isFavoriteItem("gif", {
-                                        rawUrl: modelData.rawUrl
+                                        rawUrl: itemData.rawUrl
                                     }) ? "bookmarks-bookmarked" : "bookmarks"
                                     visible: favRecGifDelegateHover.hovered
                                     width: 28
@@ -3758,11 +3801,11 @@ PlasmoidItem {
 
                                     onClicked: {
                                         fullRoot.toggleFavoriteItem("gif", {
-                                            rawUrl: modelData.rawUrl,
-                                            title: modelData.title,
-                                            webpUrl: modelData.webpUrl || modelData.rawUrl,
-                                            previewUrl: modelData.previewUrl,
-                                            aspectRatio: modelData.aspectRatio
+                                            rawUrl: itemData.rawUrl,
+                                            title: itemData.title,
+                                            webpUrl: itemData.webpUrl || itemData.rawUrl,
+                                            previewUrl: itemData.previewUrl,
+                                            aspectRatio: itemData.aspectRatio
                                         });
                                     }
                                 }
@@ -3776,7 +3819,7 @@ PlasmoidItem {
                                     border.color: Kirigami.Theme.highlightColor
 
                                     AnimatedImage {
-                                        source: fullRoot.isWidgetExpanded ? modelData.previewUrl : ""
+                                        source: fullRoot.isWidgetExpanded ? itemData.previewUrl : ""
                                         anchors.fill: parent
                                         anchors.margins: favRecGifDelegateHover.hovered ? 1 : 2
                                         fillMode: Image.Stretch
@@ -3835,7 +3878,7 @@ PlasmoidItem {
 
                                 Column {
                                     width: parent.width
-                                    spacing: 8
+                                    spacing: 0
                                     visible: favRecentsView.countEmojis > 0
 
                                     Item {
@@ -3985,7 +4028,7 @@ PlasmoidItem {
 
                                 Column {
                                     width: parent.width
-                                    spacing: 8
+                                    spacing: 0
                                     visible: favRecentsView.countGifs > 0
 
                                     Item {
@@ -4107,7 +4150,7 @@ PlasmoidItem {
 
                                 Column {
                                     width: parent.width
-                                    spacing: 8
+                                    spacing: 0
                                     visible: favRecentsView.countKitchen > 0
 
                                     Item {
