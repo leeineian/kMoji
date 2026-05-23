@@ -2247,6 +2247,7 @@ PlasmoidItem {
                         id: emojiArea
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        clip: true
                         Kirigami.Theme.colorSet: Kirigami.Theme.Window
                         Kirigami.Theme.inherit: false
 
@@ -2814,6 +2815,67 @@ PlasmoidItem {
                             clip: true
 
                             property var categoryStates: ({})
+
+                            readonly property var activeStickyInfo: {
+                                if (!contentItem || !allEmojisView.visible) return null;
+                                let currentY = contentItem.contentY;
+                                
+                                let items = [];
+                                if (typeof emojiKitchenSection !== "undefined" && emojiKitchenSection && emojiKitchenSection.visible) {
+                                    items.push({
+                                        name: emojiKitchenSection.catName,
+                                        item: emojiKitchenSection,
+                                        y: emojiKitchenSection.y,
+                                        height: emojiKitchenSection.height,
+                                        headerHeight: 32,
+                                        isKitchen: true
+                                    });
+                                }
+                                if (typeof allEmojisRepeater !== "undefined" && allEmojisRepeater) {
+                                    for (let i = 0; i < allEmojisRepeater.count; i++) {
+                                        let item = allEmojisRepeater.itemAt(i);
+                                        if (item && item.visible) {
+                                            items.push({
+                                                name: item.catName,
+                                                item: item,
+                                                y: item.y,
+                                                height: item.height,
+                                                headerHeight: 32,
+                                                isKitchen: false
+                                            });
+                                        }
+                                    }
+                                }
+
+                                if (items.length === 0) return null;
+
+                                let activeIdx = -1;
+                                for (let i = 0; i < items.length; i++) {
+                                    if (currentY >= items[i].y) {
+                                        activeIdx = i;
+                                    }
+                                }
+
+                                if (activeIdx === -1) return null;
+
+                                let active = items[activeIdx];
+                                
+                                let nextItem = (activeIdx + 1 < items.length) ? items[activeIdx + 1] : null;
+                                let offset = 0;
+                                if (nextItem && nextItem.y < currentY + active.headerHeight) {
+                                    offset = nextItem.y - (currentY + active.headerHeight);
+                                }
+
+                                return {
+                                    name: active.name,
+                                    item: active.item,
+                                    y: active.y,
+                                    height: active.height,
+                                    isKitchen: active.isKitchen,
+                                    offset: offset,
+                                    headerHeight: active.headerHeight
+                                };
+                            }
 
                             Connections {
                                 target: allEmojisView.contentItem
@@ -4037,6 +4099,99 @@ PlasmoidItem {
                                         playing: alwaysAnimateGifs || favRecGifDelegateHover.hovered
                                         paused: !playing
                                         cache: true
+                                    }
+                                }
+                            }
+                        }
+
+                        Item {
+                            id: floatingStickyHeader
+                            x: 0
+                            y: allEmojisView.activeStickyInfo ? allEmojisView.activeStickyInfo.offset : 0
+                            width: allEmojisView.width - (allEmojisView.ScrollBar.vertical.visible ? allEmojisView.ScrollBar.vertical.width : 0)
+                            height: 32
+                            z: 10
+                            visible: allEmojisView.visible && allEmojisView.activeStickyInfo !== null
+
+                            readonly property var info: allEmojisView.activeStickyInfo
+                            readonly property string catName: info ? info.name : ""
+                            readonly property bool isKitchen: info ? info.isKitchen : false
+                            readonly property bool isExpanded: info ? (allEmojisView.categoryStates[catName] !== false) : true
+                            readonly property int count: {
+                                if (!info || isKitchen) return 0;
+                                return (info.item && info.item.catEmojis) ? (info.item.catEmojis.length + info.item.catKitchens.length) : 0;
+                            }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: Kirigami.Theme.backgroundColor
+                            }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: stickyHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (stickyHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                border.color: (stickyHeaderMouse.pressed || stickyHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                border.width: 1
+                                radius: 4
+                            }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                spacing: 8
+
+                                Item {
+                                    implicitWidth: 16
+                                    implicitHeight: 16
+                                    Kirigami.Icon {
+                                        anchors.centerIn: parent
+                                        source: floatingStickyHeader.isExpanded ? "go-down" : "go-next"
+                                        width: 16
+                                        height: 16
+                                    }
+                                }
+
+                                PlasmaComponents.Label {
+                                    text: floatingStickyHeader.isKitchen ? i18n("Emoji Kitchen") : floatingStickyHeader.catName
+                                    font.bold: true
+                                    font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                }
+
+                                Rectangle {
+                                    width: stickyCountLabel.contentWidth + 12
+                                    height: 18
+                                    radius: 9
+                                    color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
+                                    visible: !floatingStickyHeader.isKitchen
+
+                                    PlasmaComponents.Label {
+                                        id: stickyCountLabel
+                                        anchors.centerIn: parent
+                                        text: floatingStickyHeader.count
+                                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                        font.bold: true
+                                        color: Kirigami.Theme.textColor
+                                    }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 1
+                                    color: Kirigami.Theme.textColor
+                                    opacity: 0.3
+                                }
+                            }
+
+                            MouseArea {
+                                id: stickyHeaderMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.LeftButton
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: function(mouse) {
+                                    if (mouse.button === Qt.LeftButton && floatingStickyHeader.catName !== "") {
+                                        allEmojisView.toggleCategory(floatingStickyHeader.catName);
                                     }
                                 }
                             }
