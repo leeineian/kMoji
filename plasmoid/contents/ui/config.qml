@@ -191,7 +191,7 @@ Kirigami.ScrollablePage {
             TextField {
                 id: klipyApiKey
                 Kirigami.FormData.label: i18n("Klipy API Key:")
-                placeholderText: i18n("Enter your Klipy API key")
+                placeholderText: i18n("Get a key from partner.klipy.com")
                 echoMode: TextInput.PasswordEchoOnEdit
                 Layout.fillWidth: true
             }

@@ -24,7 +24,7 @@ PlasmoidItem {
 
     property var _cachedEmojis: null
     readonly property string klipyBaseUrl: "https://api.klipy.com/api/v1"
-    readonly property string klipyDefaultApiKey: "c9d81d227b0b4b2fb4e0bd6f6e52003c"
+    readonly property string klipyDefaultApiKey: "s9q3axg5VURfGO45IDSDhJ1Nxm445kzNdiRF4lmbcVkJaZDe9ShO01YIOvIvtaY2"
     readonly property int klipyDefaultPerPage: 24
 
     function getIconEmojis(emojiList) {
@@ -2920,6 +2920,7 @@ PlasmoidItem {
                             property int currentPage: 1
                             property bool hasNextPage: false
                             property string lastQuery: ""
+                            property string apiErrorMsg: ""
 
                             ListModel {
                                 id: gifCol0Model
@@ -3034,6 +3035,7 @@ PlasmoidItem {
                             }
 
                             function fetchGifs(query, append) {
+                                gifView.apiErrorMsg = "";
                                 if (!append) {
                                     gifView.currentPage = 1;
                                     gifView.hasNextPage = false;
@@ -3074,6 +3076,21 @@ PlasmoidItem {
                                             gifView.currentPage = (responseData.current_page || page) + 1;
                                         } else {
                                             console.log("ERROR: Klipy API returned status: " + xhr.status);
+                                            try {
+                                                var errResponse = JSON.parse(xhr.responseText);
+                                                if (errResponse.errors && errResponse.errors.message && errResponse.errors.message.length > 0) {
+                                                    var msg = errResponse.errors.message[0];
+                                                    if (msg.indexOf("API key is invalid") !== -1) {
+                                                        gifView.apiErrorMsg = i18n("Invalid Klipy API Key. Get a new key from partner.klipy.com and update it in Settings.");
+                                                    } else {
+                                                        gifView.apiErrorMsg = msg;
+                                                    }
+                                                } else {
+                                                    gifView.apiErrorMsg = i18n("Klipy API Error: %1", xhr.status);
+                                                }
+                                            } catch (e) {
+                                                gifView.apiErrorMsg = i18n("Klipy API Error: %1", xhr.status);
+                                            }
                                         }
                                     }
                                 };
@@ -3111,10 +3128,13 @@ PlasmoidItem {
 
                             PlasmaComponents.Label {
                                 anchors.centerIn: parent
-                                text: fullRoot.filter !== "" ? i18n("No GIFs found :(") : i18n("No internet or Klipy API error")
+                                text: gifView.apiErrorMsg !== "" ? gifView.apiErrorMsg : (fullRoot.filter !== "" ? i18n("No GIFs found :(") : i18n("No internet or Klipy API error"))
                                 visible: !gifView.isLoading && !gifSearchTimer.running && gifCol0Model.count === 0 && gifCol1Model.count === 0 && gifCol2Model.count === 0
                                 font.pixelSize: fullRoot.fontSizeEmptyLabel
                                 opacity: 0.6
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.WordWrap
+                                width: Math.min(implicitWidth, parent.width - 40)
                             }
 
                             Component {
