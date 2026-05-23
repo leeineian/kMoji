@@ -93,7 +93,6 @@ Item {
 
     // ── Constants ────────────────────────────────────────────────────────────
     // Category keys used throughout filter logic and UI comparisons.
-    // Change once here if the category identifiers ever need to be renamed.
     readonly property string catAll:          "All"
     readonly property string catFavorites:    "Favorites"
     readonly property string catRecent:       "Recent"
@@ -133,6 +132,14 @@ Item {
     property var recentEmojis: []
     property var favoriteEmojis: []
     
+    // Collapsible states for Favorites/Recents sections
+    property bool favoritesEmojisExpanded: true
+    property bool favoritesGifsExpanded: true
+    property bool favoritesKitchenExpanded: true
+    property bool recentEmojisExpanded: true
+    property bool recentGifsExpanded: true
+    property bool recentKitchenExpanded: true
+    
     // Loading State
     property bool isLoading: false
     property int loadingProgress: 0
@@ -142,6 +149,47 @@ Item {
     
     // Temporary storage for the loading process
     property var loadingBuffer: []
+    property var activeEmojis: []
+    property var activeGifs: []
+    property var activeKitchens: []
+
+    function _updateActiveSubLists() {
+        activeEmojis   = filteredEmojis.filter(e => !e.type || e.type === "emoji")
+        activeGifs     = filteredEmojis.filter(e => e.type === "gif")
+        activeKitchens = filteredEmojis.filter(e => e.type === "kitchen")
+    }
+
+    // Keep legacy helpers for any call-sites that still use them
+    function getActiveEmojis()   { return activeEmojis }
+    function getActiveGifs()     { return activeGifs }
+    function getActiveKitchens() { return activeKitchens }
+
+    // Pre-split GIF columns so Repeater models don't recompute on every render
+    property var activeGifCol0: []
+    property var activeGifCol1: []
+    property var activeGifCol2: []
+
+    function _updateActiveGifCols(numCols) {
+        const gifs = activeGifs
+        const c0 = [], c1 = [], c2 = []
+        for (let i = 0; i < gifs.length; i++) {
+            const col = i % numCols
+            if (col === 0) c0.push(gifs[i])
+            else if (col === 1) c1.push(gifs[i])
+            else c2.push(gifs[i])
+        }
+        activeGifCol0 = c0
+        activeGifCol1 = c1
+        activeGifCol2 = numCols >= 3 ? c2 : []
+    }
+
+    // Legacy helper kept for compatibility
+    function getActiveGifCol(colIndex, numCols) {
+        if (colIndex === 0) return activeGifCol0
+        if (colIndex === 1) return activeGifCol1
+        return activeGifCol2
+    }
+
 
     // Grid State
     property bool gridIsMouseOver: false
@@ -282,19 +330,33 @@ Item {
         }
     }
 
-    function addRecentEmoji(emoji) {
+    function addRecentItem(type, item) {
+        if (!item) return
         let newRecentEmojis = []
         let found = false
 
         for (let i = 0; i < recentEmojis.length; i++) {
-            if (!found && recentEmojis[i].emoji === emoji.emoji) {
-                found = true
-                continue
+            const rec = recentEmojis[i]
+            const recType = rec.type || "emoji"
+            if (recType === type) {
+                if (type === "emoji" && rec.emoji === item.emoji) {
+                    found = true
+                    continue
+                }
+                if (type === "gif" && rec.rawUrl === item.rawUrl) {
+                    found = true
+                    continue
+                }
+                if (type === "kitchen" && rec.url === item.url) {
+                    found = true
+                    continue
+                }
             }
-            newRecentEmojis.push(recentEmojis[i])
+            newRecentEmojis.push(rec)
         }
 
-        newRecentEmojis.unshift(emoji)
+        const copy = Object.assign({ type: type }, item)
+        newRecentEmojis.unshift(copy)
 
         if (newRecentEmojis.length > 100) {
             newRecentEmojis = newRecentEmojis.slice(0, 100)
@@ -306,38 +368,76 @@ Item {
         } catch (e) {
             console.log("Failed to save recent emojis:", e)
         }
+        updateFilteredEmojis()
     }
 
-    function toggleFavoriteEmoji(emoji) {
-        if (!emoji) return false
+    function addRecentEmoji(emoji) {
+        addRecentItem("emoji", emoji)
+    }
+
+    function isFavoriteItem(type, item) {
+        if (!item) return false
+        const len = favoriteEmojis.length
+        for (let i = 0; i < len; i++) {
+            const fav = favoriteEmojis[i]
+            const favType = fav.type || "emoji"
+            if (favType !== type) continue
+
+            if (type === "emoji" && fav.emoji === item.emoji) {
+                return true
+            } else if (type === "gif" && fav.rawUrl === item.rawUrl) {
+                return true
+            } else if (type === "kitchen" && fav.url === item.url) {
+                return true
+            }
+        }
+        return false
+    }
+
+    function isFavorite(emoji) {
+        return isFavoriteItem("emoji", { emoji: emoji })
+    }
+
+    function toggleFavoriteItem(type, item) {
+        if (!item) return false
         let isFavoriteNow = false
-        const index = favoriteEmojis.findIndex(e => e.emoji === emoji.emoji)
+        const index = favoriteEmojis.findIndex(e => {
+            const favType = e.type || "emoji"
+            if (favType !== type) return false
+            if (type === "emoji") return e.emoji === item.emoji
+            if (type === "gif") return e.rawUrl === item.rawUrl
+            if (type === "kitchen") return e.url === item.url
+            return false
+        })
+
         if (index >= 0) {
             favoriteEmojis.splice(index, 1)
             isFavoriteNow = false
         } else {
-            favoriteEmojis.push(emoji)
+            const copy = Object.assign({ type: type }, item)
+            favoriteEmojis.push(copy)
             isFavoriteNow = true
         }
         favoriteEmojis = favoriteEmojis.slice()
         saveFavoriteEmojis()
         updateFilteredEmojis()
 
-        const displayName = (emoji && emoji.name && emoji.name.length > 0) ? emoji.name : ""
-        const label = displayName && displayName.length > 0 ? displayName + " (" + emoji.emoji + ")" : emoji.emoji
-        showSearchTemporaryMessage(isFavoriteNow ? i18n("Favorited: %1", label) : i18n("Unfavorited: %1", label))
+        let label = ""
+        if (type === "emoji") {
+            const displayName = (item.name && item.name.length > 0) ? item.name : ""
+            label = displayName && displayName.length > 0 ? displayName + " (" + item.emoji + ")" : item.emoji
+        } else if (type === "gif") {
+            label = item.title || "Klipy GIF"
+        } else if (type === "kitchen") {
+            label = i18n("Emoji Kitchen Mashup (%1 + %2)", item.emoji1, item.emoji2)
+        }
 
+        showSearchTemporaryMessage(isFavoriteNow ? i18n("Favorited: %1", label) : i18n("Unfavorited: %1", label))
         return isFavoriteNow
     }
 
-    function isFavorite(emoji) {
-        const len = favoriteEmojis.length
-        for (let i = 0; i < len; i++) {
-            if (favoriteEmojis[i].emoji === emoji) {
-                return true
-            }
-        }
-        return false
+    function toggleFavoriteEmoji(emoji) {
+        return toggleFavoriteItem("emoji", emoji)
     }
 
     function saveFavoriteEmojis() {
@@ -454,6 +554,9 @@ Item {
     }
 
     onFilteredEmojisChanged: {
+        _updateActiveSubLists()
+        _updateActiveGifCols(3)
+
         if (fullRoot.filter && fullRoot.filter.length > 0 && fullRoot.filteredEmojis.length > 0) {
             const firstItem = fullRoot.filteredEmojis[0]
             fullRoot.emojiHoveredEmojiKey = firstItem.emoji
@@ -1744,7 +1847,6 @@ Item {
                 Layout.preferredWidth: 1
             }
 
-            // --- Emoji Grid ---
             Item {
                 id: emojiArea
                 Layout.fillWidth: true
@@ -1752,7 +1854,6 @@ Item {
                 Kirigami.Theme.colorSet: Kirigami.Theme.Window
                 Kirigami.Theme.inherit: false
                 
-                // --- Emoji Kitchen View ---
                 Item {
                     id: kitchenView
                     anchors.fill: parent
@@ -1827,13 +1928,11 @@ Item {
                                 
                                 let candidates = [];
                                 
-                                // Base is folder (unstripped first, then stripped)
                                 candidates.push(baseUrl + toUrl(b_unstripped) + "/" + toUrl(combo.b) + "_" + toUrl(combo.p) + ".png");
                                 if (b_stripped !== b_unstripped) {
                                     candidates.push(baseUrl + toUrl(b_stripped) + "/" + toUrl(combo.b) + "_" + toUrl(combo.p) + ".png");
                                 }
                                 
-                                // Partner is folder (unstripped first, then stripped)
                                 candidates.push(baseUrl + toUrl(p_unstripped) + "/" + toUrl(combo.p) + "_" + toUrl(combo.b) + ".png");
                                 if (p_stripped !== p_unstripped) {
                                     candidates.push(baseUrl + toUrl(p_stripped) + "/" + toUrl(combo.p) + "_" + toUrl(combo.b) + ".png");
@@ -1933,10 +2032,15 @@ Item {
                             let cmd = 'curl -sL "' + currentValidUrl + '" > /tmp/kmoji_copy.png && (wl-copy --type image/png < /tmp/kmoji_copy.png || xclip -selection clipboard -t image/png -i /tmp/kmoji_copy.png)'
                             shellSource.connectSource(cmd)
                             showPasteTemporaryMessage(i18n("Copied mashup to clipboard!"))
+                            
+                            fullRoot.addRecentItem("kitchen", {
+                                url: currentValidUrl,
+                                emoji1: emoji1,
+                                emoji2: emoji2
+                            })
                         }
                     }
 
-                        // --- Selection and Result Area ---
                         RowLayout {
                             id: selectionRow
                             anchors.top: parent.top
@@ -2170,6 +2274,26 @@ Item {
                                         }
                                     }
 
+                                    PlasmaComponents.ToolButton {
+                                        anchors.top: parent.top
+                                        anchors.right: parent.right
+                                        anchors.margins: 4
+                                        icon.name: fullRoot.isFavoriteItem("kitchen", { url: kitchenView.currentValidUrl }) ? "bookmarks-bookmarked" : "bookmarks"
+                                        visible: resultSlotArea.containsMouse && kitchenView.currentValidUrl !== ""
+                                        width: 24
+                                        height: 24
+                                        display: PlasmaComponents.ToolButton.IconOnly
+                                        z: 10
+                                        
+                                        onClicked: {
+                                            fullRoot.toggleFavoriteItem("kitchen", {
+                                                url: kitchenView.currentValidUrl,
+                                                emoji1: kitchenView.emoji1,
+                                                emoji2: kitchenView.emoji2
+                                            })
+                                        }
+                                    }
+
                                     Keys.onReturnPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
                                     Keys.onEnterPressed: if(kitchenView.currentValidUrl !== "") kitchenView.copyResult()
                                 }
@@ -2192,7 +2316,6 @@ Item {
                             }
                         }
 
-                        // --- Grid Area ---
                         Kirigami.Separator {
                             id: gridSeparator
                             anchors.top: selectionRow.bottom
@@ -2392,7 +2515,6 @@ Item {
                         }
                 }
 
-                // --- Klipy GIF View ---
                 Item {
                     id: gifView
                     anchors.fill: parent
@@ -2613,14 +2735,21 @@ Item {
                         gifView.fetchGifs(gifView.lastQuery, true)
                     }
 
-                    function copyGif(gifUrl, title) {
+                    function copyGif(gifUrl, title, webpUrl, previewUrl, aspectRatio) {
                         if (!gifUrl) return;
 
                         clipboard.content = gifUrl
                         fullRoot.showPasteTemporaryMessage(i18n("Copied: %1", title))
+                        
+                        fullRoot.addRecentItem("gif", {
+                            rawUrl: gifUrl,
+                            title: title,
+                            webpUrl: webpUrl || gifUrl,
+                            previewUrl: previewUrl || gifUrl,
+                            aspectRatio: aspectRatio || 1.0
+                        })
                     }
 
-                    // --- Custom Busy Indicator Loader ---
                     PlasmaComponents.BusyIndicator {
                         id: gifLoadingIndicator
                         anchors.centerIn: parent
@@ -2628,7 +2757,6 @@ Item {
                         visible: running
                     }
 
-                    // --- Empty / Error state label ---
                     PlasmaComponents.Label {
                         anchors.centerIn: parent
                         text: fullRoot.filter !== "" ? i18n("No GIFs found :(") : i18n("No internet or Klipy API error")
@@ -2637,7 +2765,6 @@ Item {
                         opacity: 0.6
                     }
 
-                    // --- Component delegate for the masonry elements ---
                     Component {
                         id: gifDelegate
 
@@ -2646,7 +2773,7 @@ Item {
                             height: Math.floor(width / model.aspectRatio)
 
                             onClicked: {
-                                gifView.copyGif(model.rawUrl, model.title)
+                                gifView.copyGif(model.rawUrl, model.title, model.webpUrl, model.previewUrl, model.aspectRatio)
                                 if (plasmoid.configuration.CloseAfterSelection) {
                                     if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
                                 }
@@ -2692,12 +2819,31 @@ Item {
                                     }
                                 }
 
-
+                                PlasmaComponents.ToolButton {
+                                    anchors.top: parent.top
+                                    anchors.right: parent.right
+                                    anchors.margins: 4
+                                    icon.name: fullRoot.isFavoriteItem("gif", { rawUrl: model.rawUrl }) ? "bookmarks-bookmarked" : "bookmarks"
+                                    visible: gifHoverHandler.hovered
+                                    width: 24
+                                    height: 24
+                                    display: PlasmaComponents.ToolButton.IconOnly
+                                    z: 10
+                                    
+                                    onClicked: {
+                                        fullRoot.toggleFavoriteItem("gif", {
+                                            rawUrl: model.rawUrl,
+                                            title: model.title,
+                                            webpUrl: model.webpUrl || model.rawUrl,
+                                            previewUrl: model.previewUrl,
+                                            aspectRatio: model.aspectRatio
+                                        })
+                                    }
+                                }
                             }
                         }
                     }
 
-                    // --- Scrollable Masonry Waterfall View ---
                     Flickable {
                         id: gifFlickable
                         anchors.fill: parent
@@ -2779,7 +2925,6 @@ Item {
                             }
                         }
 
-                        // --- Loading More Indicator ---
                         PlasmaComponents.BusyIndicator {
                             anchors.horizontalCenter: parent.horizontalCenter
                             y: Math.max(col0.childrenRect.height, col1.childrenRect.height, col2.childrenRect.height) + 12
@@ -2794,7 +2939,7 @@ Item {
                 RowLayout {
                     anchors.fill: parent
                     spacing: 0
-                    visible: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen && fullRoot.selectedCategory !== fullRoot.catGifs
+                    visible: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen && fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.selectedCategory !== fullRoot.catFavorites && fullRoot.selectedCategory !== fullRoot.catRecent
 
                     GridView {
                         id: emojiGridView
@@ -2819,7 +2964,6 @@ Item {
                                 fullRoot.gridIsMouseOver = hovered
                                 if (!hovered && fullRoot.emojiHoveredEmojiKey !== "") {
                                     fullRoot.emojiLastHoveredEmojiKey = fullRoot.emojiHoveredEmojiKey
-                                    fullRoot.emojiHoveredEmojiKey = ""
                                     fullRoot.emojiHoveredEmojiKey = ""
                                     fullRoot.hoveredEmojiName = ""
                                 }
@@ -2936,7 +3080,6 @@ Item {
                                     if (item) {
                                         if (fullRoot.emojiHoveredEmojiKey !== item.emoji) {
                                             fullRoot.emojiHoveredEmojiKey = item.emoji
-                                            fullRoot.emojiHoveredEmojiKey = item.emoji
                                             fullRoot.hoveredEmojiName = item.name
                                         }
                                         if (fullRoot.emojiLastHoveredEmojiKey !== item.emoji) {
@@ -2948,7 +3091,6 @@ Item {
 
                         function clearKeyboardHover() {
                             if (fullRoot.emojiHoveredEmojiKey !== "") {
-                                fullRoot.emojiHoveredEmojiKey = ""
                                 fullRoot.emojiHoveredEmojiKey = ""
                                 fullRoot.hoveredEmojiName = ""
                             }
@@ -2978,7 +3120,6 @@ Item {
                                 } else if (event.key === Qt.Key_Space) {
                                     if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
                                         const item = fullRoot.filteredEmojis[currentIndex]
-                                        fullRoot.emojiHoveredEmojiKey = item.emoji
                                         fullRoot.emojiHoveredEmojiKey = item.emoji
                                         fullRoot.hoveredEmojiName = item.name
                                     }
@@ -3140,7 +3281,6 @@ Item {
 
                                 onEntered: {
                                     fullRoot.emojiHoveredEmojiKey = modelData.emoji
-                                    fullRoot.emojiHoveredEmojiKey = modelData.emoji
                                     fullRoot.hoveredEmojiName = modelData.name
 
                                     if (emojiGridView && fullRoot.emojiKeyboardNavigationEnabled) {
@@ -3170,6 +3310,518 @@ Item {
                                 onPressAndHold: {
                                     var globalPos = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y)
                                     handleEmojiRightClicked(modelData.emoji, modelData, globalPos)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Component {
+                    id: favRecGifDelegate
+
+                    PC3.ItemDelegate {
+                        width: parent.parent.width
+                        height: Math.floor(width / modelData.aspectRatio)
+
+                        onClicked: {
+                            gifView.copyGif(modelData.rawUrl, modelData.title, modelData.webpUrl, modelData.previewUrl, modelData.aspectRatio)
+                            if (plasmoid.configuration.CloseAfterSelection) {
+                                    if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
+                            }
+                        }
+
+                        background: Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            color: Kirigami.Theme.alternateBackgroundColor
+                            radius: 6
+                            border.width: favRecGifHoverHandler.hovered ? 2 : 0
+                            border.color: Kirigami.Theme.highlightColor
+
+                            AnimatedImage {
+                                source: modelData.previewUrl
+                                anchors.fill: parent
+                                anchors.margins: favRecGifHoverHandler.hovered ? 1 : 2
+                                fillMode: Image.Stretch
+                                playing: favRecGifHoverHandler.hovered
+                                paused: !favRecGifHoverHandler.hovered
+                                cache: true
+                            }
+
+                            HoverHandler {
+                                id: favRecGifHoverHandler
+                                onHoveredChanged: {
+                                    if (hovered) {
+                                        fullRoot.hoveredGifTitle = modelData.title
+                                        fullRoot.hoveredGifUrl = modelData.previewUrl
+                                    } else {
+                                        if (fullRoot.hoveredGifUrl === modelData.previewUrl) {
+                                            fullRoot.hoveredGifTitle = ""
+                                            fullRoot.hoveredGifUrl = ""
+                                        }
+                                    }
+                                }
+                            }
+
+                            PlasmaComponents.ToolButton {
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.margins: 4
+                                icon.name: fullRoot.isFavoriteItem("gif", { rawUrl: modelData.rawUrl }) ? "bookmarks-bookmarked" : "bookmarks"
+                                visible: favRecGifHoverHandler.hovered
+                                width: 24
+                                height: 24
+                                display: PlasmaComponents.ToolButton.IconOnly
+                                z: 10
+
+                                onClicked: {
+                                    fullRoot.toggleFavoriteItem("gif", {
+                                        rawUrl: modelData.rawUrl,
+                                        title: modelData.title,
+                                        webpUrl: modelData.webpUrl || modelData.rawUrl,
+                                        previewUrl: modelData.previewUrl,
+                                        aspectRatio: modelData.aspectRatio
+                                    })
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ScrollView {
+                    id: favRecentsView
+                    anchors.fill: parent
+                    visible: fullRoot.selectedCategory === fullRoot.catFavorites || fullRoot.selectedCategory === fullRoot.catRecent
+                    clip: true
+
+                    readonly property int countEmojis: fullRoot.activeEmojis.length
+                    readonly property int countGifs: fullRoot.activeGifs.length
+                    readonly property int countKitchen: fullRoot.activeKitchens.length
+
+                    property bool isEmojisExpanded: fullRoot.selectedCategory === fullRoot.catFavorites ? fullRoot.favoritesEmojisExpanded : fullRoot.recentEmojisExpanded
+                    property bool isGifsExpanded: fullRoot.selectedCategory === fullRoot.catFavorites ? fullRoot.favoritesGifsExpanded : fullRoot.recentGifsExpanded
+                    property bool isKitchenExpanded: fullRoot.selectedCategory === fullRoot.catFavorites ? fullRoot.favoritesKitchenExpanded : fullRoot.recentKitchenExpanded
+
+                    function toggleEmojisExpanded() {
+                        if (fullRoot.selectedCategory === fullRoot.catFavorites) {
+                            fullRoot.favoritesEmojisExpanded = !fullRoot.favoritesEmojisExpanded
+                        } else {
+                            fullRoot.recentEmojisExpanded = !fullRoot.recentEmojisExpanded
+                        }
+                    }
+
+                    function toggleGifsExpanded() {
+                        if (fullRoot.selectedCategory === fullRoot.catFavorites) {
+                            fullRoot.favoritesGifsExpanded = !fullRoot.favoritesGifsExpanded
+                        } else {
+                            fullRoot.recentGifsExpanded = !fullRoot.recentGifsExpanded
+                        }
+                    }
+
+                    function toggleKitchenExpanded() {
+                        if (fullRoot.selectedCategory === fullRoot.catFavorites) {
+                            fullRoot.favoritesKitchenExpanded = !fullRoot.favoritesKitchenExpanded
+                        } else {
+                            fullRoot.recentKitchenExpanded = !fullRoot.recentKitchenExpanded
+                        }
+                    }
+
+                    ColumnLayout {
+                        width: favRecentsView.width - 16
+                        spacing: 16
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.leftMargin: 8
+                        anchors.topMargin: 8
+
+                        // ================= EMOJIS SECTION =================
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: favRecentsView.countEmojis > 0
+
+                            Item {
+                                Layout.fillWidth: true
+                                height: 32
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: Kirigami.Theme.highlightColor
+                                    opacity: emojiHeaderMouse.containsMouse ? 0.1 : 0
+                                    radius: 4
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                                }
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 4
+                                    anchors.rightMargin: 4
+                                    spacing: 8
+
+                                    Kirigami.Icon {
+                                        source: favRecentsView.isEmojisExpanded ? "go-down" : "go-next"
+                                        width: 16
+                                        height: 16
+                                    }
+
+                                    PlasmaComponents.Label {
+                                        text: i18n("Emojis")
+                                        font.bold: true
+                                        font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                    }
+
+                                    Rectangle {
+                                        width: emojiCountLabel.contentWidth + 12
+                                        height: 18
+                                        radius: 9
+                                        color: Kirigami.Theme.highlightColor
+                                        opacity: 0.2
+
+                                        PlasmaComponents.Label {
+                                            id: emojiCountLabel
+                                            anchors.centerIn: parent
+                                            text: favRecentsView.countEmojis
+                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                            font.bold: true
+                                            color: Kirigami.Theme.highlightColor
+                                        }
+                                    }
+
+                                    Kirigami.Separator {
+                                        Layout.fillWidth: true
+                                        opacity: 0.3
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: emojiHeaderMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: favRecentsView.toggleEmojisExpanded()
+                                }
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 4
+                                visible: favRecentsView.isEmojisExpanded
+
+                                Repeater {
+                                    model: fullRoot.activeEmojis
+
+                                    delegate: Item {
+                                        width: fullRoot.internalGridSize
+                                        height: fullRoot.internalGridSize
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            anchors.margins: 2
+                                            color: Kirigami.Theme.highlightColor
+                                            radius: 4
+                                            opacity: emojiMouseArea.pressed ? 1.0 : (emojiMouseArea.containsMouse ? 0.2 : 0)
+                                        }
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            color: "transparent"
+                                            radius: 4
+                                            border.width: (emojiMouseArea.pressed || emojiMouseArea.containsMouse) ? 2 : 0
+                                            border.color: Kirigami.Theme.highlightColor
+                                        }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.emoji
+                                            font.pixelSize: Math.floor(fullRoot.internalGridSize * 0.81)
+                                            font.family: "Noto Color Emoji"
+                                            renderType: Text.NativeRendering
+                                        }
+
+                                        MouseArea {
+                                            id: emojiMouseArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+                                            onEntered: {
+                                                fullRoot.emojiHoveredEmojiKey = modelData.emoji
+                                                fullRoot.hoveredEmojiName = modelData.name
+                                            }
+
+                                            onExited: {
+                                                if (fullRoot.emojiHoveredEmojiKey === modelData.emoji) {
+                                                    fullRoot.emojiHoveredEmojiKey = ""
+                                                    fullRoot.hoveredEmojiName = ""
+                                                }
+                                            }
+
+                                            onClicked: function(mouse) {
+                                                if (mouse.button === Qt.LeftButton) {
+                                                    fullRoot.handleEmojiSelected(modelData.emoji, mouse.modifiers & Qt.ControlModifier, mouse.modifiers & Qt.ShiftModifier, mouse.modifiers & Qt.AltModifier)
+                                                } else if (mouse.button === Qt.RightButton) {
+                                                    var globalPos = mapToItem(fullRoot, mouse.x, mouse.y)
+                                                    contextMenu.emoji = modelData.emoji
+                                                    contextMenu.emojiObj = modelData
+                                                    contextMenu.popup(globalPos.x, globalPos.y)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ================= GIFS SECTION =================
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: favRecentsView.countGifs > 0
+
+                            Item {
+                                Layout.fillWidth: true
+                                height: 32
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: Kirigami.Theme.highlightColor
+                                    opacity: gifHeaderMouse.containsMouse ? 0.1 : 0
+                                    radius: 4
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                                }
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 4
+                                    anchors.rightMargin: 4
+                                    spacing: 8
+
+                                    Kirigami.Icon {
+                                        source: favRecentsView.isGifsExpanded ? "go-down" : "go-next"
+                                        width: 16
+                                        height: 16
+                                    }
+
+                                    PlasmaComponents.Label {
+                                        text: i18n("GIFs")
+                                        font.bold: true
+                                        font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                    }
+
+                                    Rectangle {
+                                        width: gifCountLabel.contentWidth + 12
+                                        height: 18
+                                        radius: 9
+                                        color: Kirigami.Theme.highlightColor
+                                        opacity: 0.2
+
+                                        PlasmaComponents.Label {
+                                            id: gifCountLabel
+                                            anchors.centerIn: parent
+                                            text: favRecentsView.countGifs
+                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                            font.bold: true
+                                            color: Kirigami.Theme.highlightColor
+                                        }
+                                    }
+
+                                    Kirigami.Separator {
+                                        Layout.fillWidth: true
+                                        opacity: 0.3
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: gifHeaderMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: favRecentsView.toggleGifsExpanded()
+                                }
+                            }
+
+                            RowLayout {
+                                id: favRecentsMasonryRow
+                                Layout.fillWidth: true
+                                spacing: 6
+                                visible: favRecentsView.isGifsExpanded
+
+                                readonly property int numColumns: width > 360 ? 3 : 2
+                                readonly property int columnWidth: Math.floor((width - (numColumns - 1) * spacing) / numColumns)
+
+                                ColumnLayout {
+                                    spacing: 6
+                                    Layout.fillHeight: false
+                                    Layout.alignment: Qt.AlignTop
+                                    Layout.preferredWidth: parent.columnWidth
+
+                                    Repeater {
+                                        model: fullRoot.activeGifCol0
+                                        delegate: favRecGifDelegate
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 6
+                                    Layout.fillHeight: false
+                                    Layout.alignment: Qt.AlignTop
+                                    Layout.preferredWidth: parent.columnWidth
+
+                                    Repeater {
+                                        model: fullRoot.activeGifCol1
+                                        delegate: favRecGifDelegate
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 6
+                                    Layout.fillHeight: false
+                                    Layout.alignment: Qt.AlignTop
+                                    Layout.preferredWidth: parent.columnWidth
+                                    visible: parent.numColumns === 3
+
+                                    Repeater {
+                                        model: fullRoot.activeGifCol2
+                                        delegate: favRecGifDelegate
+                                    }
+                                }
+                            }
+                        }
+
+                        // ================= EMOJI KITCHEN SECTION =================
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: favRecentsView.countKitchen > 0
+
+                            Item {
+                                Layout.fillWidth: true
+                                height: 32
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: Kirigami.Theme.highlightColor
+                                    opacity: kitchenHeaderMouse.containsMouse ? 0.1 : 0
+                                    radius: 4
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                                }
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 4
+                                    anchors.rightMargin: 4
+                                    spacing: 8
+
+                                    Kirigami.Icon {
+                                        source: favRecentsView.isKitchenExpanded ? "go-down" : "go-next"
+                                        width: 16
+                                        height: 16
+                                    }
+
+                                    PlasmaComponents.Label {
+                                        text: i18n("Emoji Kitchen")
+                                        font.bold: true
+                                        font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                    }
+
+                                    Rectangle {
+                                        width: kitchenCountLabel.contentWidth + 12
+                                        height: 18
+                                        radius: 9
+                                        color: Kirigami.Theme.highlightColor
+                                        opacity: 0.2
+
+                                        PlasmaComponents.Label {
+                                            id: kitchenCountLabel
+                                            anchors.centerIn: parent
+                                            text: favRecentsView.countKitchen
+                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                            font.bold: true
+                                            color: Kirigami.Theme.highlightColor
+                                        }
+                                    }
+
+                                    Kirigami.Separator {
+                                        Layout.fillWidth: true
+                                        opacity: 0.3
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: kitchenHeaderMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: favRecentsView.toggleKitchenExpanded()
+                                }
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                visible: favRecentsView.isKitchenExpanded
+
+                                Repeater {
+                                    model: fullRoot.activeKitchens
+
+                                    delegate: Item {
+                                        width: 64
+                                        height: 64
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            color: Kirigami.Theme.alternateBackgroundColor
+                                            border.color: (kitchenHoverHandler.hovered || kitchenMouseArea.pressed) ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                            border.width: (kitchenHoverHandler.hovered || kitchenMouseArea.pressed) ? 2 : 1
+                                            radius: 8
+
+                                            Image {
+                                                anchors.fill: parent
+                                                anchors.margins: 4
+                                                source: modelData.url
+                                                fillMode: Image.PreserveAspectFit
+                                                smooth: true
+                                            }
+
+                                            HoverHandler {
+                                                id: kitchenHoverHandler
+                                            }
+
+                                            MouseArea {
+                                                id: kitchenMouseArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    let cmd = 'curl -sL "' + modelData.url + '" > /tmp/kmoji_copy.png && (wl-copy --type image/png < /tmp/kmoji_copy.png || xclip -selection clipboard -t image/png -i /tmp/kmoji_copy.png)'
+                                                    shellSource.connectSource(cmd)
+                                                    showPasteTemporaryMessage(i18n("Copied mashup to clipboard!"))
+
+                                                    fullRoot.addRecentItem("kitchen", modelData)
+
+                                                    if (plasmoid.configuration.CloseAfterSelection) {
+                                                        if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
+                                                    }
+                                                }
+                                            }
+
+                                            PlasmaComponents.ToolButton {
+                                                anchors.top: parent.top
+                                                anchors.right: parent.right
+                                                anchors.margins: 2
+                                                icon.name: fullRoot.isFavoriteItem("kitchen", { url: modelData.url }) ? "bookmarks-bookmarked" : "bookmarks"
+                                                visible: kitchenHoverHandler.hovered
+                                                width: 18
+                                                height: 18
+                                                display: PlasmaComponents.ToolButton.IconOnly
+                                                z: 10
+
+                                                onClicked: {
+                                                    fullRoot.toggleFavoriteItem("kitchen", modelData)
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3216,7 +3868,7 @@ Item {
                         anchors.centerIn: parent
                         text: fullRoot.emojiHoveredEmojiKey
                         font.pixelSize: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? Math.floor((previewBar.height - 20) * 1.18) : (previewBar.height - 20)
-                        font.family: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? "Noto Color Emoji" : undefined
+                        font.family: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? "Noto Color Emoji" : ""
                         visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.emojiHoveredEmojiKey !== ""
                         color: Kirigami.Theme.textColor
                         renderType: Text.NativeRendering

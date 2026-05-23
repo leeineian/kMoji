@@ -345,26 +345,22 @@ Kirigami.ScrollablePage {
             const scriptUrl = Qt.resolvedUrl('../../service/emoji_metadata.sh')
             let path = scriptUrl.toString()
 
-            // Strip protocol robustly
             if (path.startsWith("file://")) {
                 path = path.substring(7)
             } else if (path.startsWith("file:")) {
                 path = path.substring(5)
             }
 
-            // Decode path (e.g. spaces -> %20 handled)
             const cleanPath = decodeURIComponent(path)
             
             addSystemLog("Sync started.")
 
-            // Check if path looks valid (basic sanity check)
             if (cleanPath.length === 0 || cleanPath.includes("undefined")) {
                  addSystemLog("Error: Could not resolve script path.")
                  finishSync(1)
                  return
             }
 
-            // Safety: Disconnect previous command if valid to prevent dangling connections
             if (currentCommand !== "") {
                 shellSource.disconnectSource(currentCommand)
             }
