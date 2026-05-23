@@ -29,6 +29,7 @@ Item {
 
     // State
     property var plasmoidItem: null
+    readonly property bool isWidgetExpanded: fullRoot.plasmoidItem ? fullRoot.plasmoidItem.expanded : true
     property bool sidebarExpanded: false
     property bool isAnyCategoryDragging: false
     property var selectedEmojis: []
@@ -149,11 +150,22 @@ Item {
     
     // Temporary storage for the loading process
     property var loadingBuffer: []
+    // Pre-computed list of kitchen-capable emojis (built once after load, never recomputed on switch)
+    property var kitchenEmojiList: []
+    // Pre-grouped emojis by category for O(1) category-switch lookups
+    property var emojiByGroup: ({})
     property var activeEmojis: []
     property var activeGifs: []
     property var activeKitchens: []
 
     function _updateActiveSubLists() {
+        if (selectedCategory !== catFavorites && selectedCategory !== catRecent) {
+            activeEmojis   = []
+            activeGifs     = []
+            activeKitchens = []
+            return
+        }
+
         activeEmojis   = filteredEmojis.filter(e => !e.type || e.type === "emoji")
         activeGifs     = filteredEmojis.filter(e => e.type === "gif")
         activeKitchens = filteredEmojis.filter(e => e.type === "kitchen")
@@ -164,12 +176,22 @@ Item {
     function getActiveGifs()     { return activeGifs }
     function getActiveKitchens() { return activeKitchens }
 
-    // Pre-split GIF columns so Repeater models don't recompute on every render
+    readonly property int favRecentsNumColumns: (fullRoot.width - 16) > 360 ? 3 : 2
     property var activeGifCol0: []
     property var activeGifCol1: []
     property var activeGifCol2: []
+    property int _lastNumCols: -1
+
+    onActiveGifsChanged: _updateActiveGifCols(favRecentsNumColumns)
+    onFavRecentsNumColumnsChanged: _updateActiveGifCols(favRecentsNumColumns)
 
     function _updateActiveGifCols(numCols) {
+        if (_lastNumCols === numCols && activeGifs.length === (activeGifCol0.length + activeGifCol1.length + activeGifCol2.length)) {
+            // Guard: no change in column structure or total count, skip recreating arrays to prevent delegate destruction loops!
+            return
+        }
+        _lastNumCols = numCols
+
         const gifs = activeGifs
         const c0 = [], c1 = [], c2 = []
         for (let i = 0; i < gifs.length; i++) {
@@ -265,6 +287,25 @@ Item {
             loadingBuffer = []
             pendingEmojis = []
             console.log("Successfully loaded", emojiList.length, "emojis asynchronously")
+
+            const kitchenBases = new Set(Object.keys(KitchenMetadata.kitchenMetadata))
+            kitchenEmojiList = emojiList.filter(e => {
+                if (!e.emoji) return false
+                let cp = []
+                for (const char of e.emoji) cp.push(char.codePointAt(0).toString(16))
+                return kitchenBases.has(cp.join("-"))
+            })
+
+            const byGroup = {}
+            for (let i = 0; i < emojiList.length; i++) {
+                const g = emojiList[i].group
+                if (g) {
+                    if (!byGroup[g]) byGroup[g] = []
+                    byGroup[g].push(emojiList[i])
+                }
+            }
+            emojiByGroup = byGroup
+
             updateFilteredEmojis()
         }
     }
@@ -301,18 +342,27 @@ Item {
     function loadRecentEmojis() {
         try {
             if (settings.recentEmojisJson && settings.recentEmojisJson !== "[]") {
-                recentEmojis = JSON.parse(settings.recentEmojisJson)
-                if (recentEmojis.length > 100) {
-                    recentEmojis = recentEmojis.slice(0, 100)
-                    try {
-                        settings.recentEmojisJson = JSON.stringify(recentEmojis)
-                    } catch (e) {
-                        console.log("Failed to save trimmed recent emojis:", e)
+                let parsed = JSON.parse(settings.recentEmojisJson)
+                if (Array.isArray(parsed)) {
+                    recentEmojis = parsed.map(item => {
+                        if (item && item.type === "gif") {
+                            let r = item.aspectRatio
+                            if (isNaN(r) || !r || r <= 0) item.aspectRatio = 1.0
+                        }
+                        return item
+                    })
+                    if (recentEmojis.length > 100) {
+                        recentEmojis = recentEmojis.slice(0, 100)
+                        try {
+                            settings.recentEmojisJson = JSON.stringify(recentEmojis)
+                        } catch (e) {
+                            console.log("Failed to save trimmed recent emojis:", e)
+                        }
                     }
+                    return
                 }
-            } else {
-                recentEmojis = []
             }
+            recentEmojis = []
         } catch (e) {
             console.log("Failed to load recent emojis:", e)
             recentEmojis = []
@@ -322,8 +372,19 @@ Item {
     function loadFavoriteEmojis() {
         try {
             if (settings.favoriteEmojisJson && settings.favoriteEmojisJson !== "[]") {
-                favoriteEmojis = JSON.parse(settings.favoriteEmojisJson)
+                let parsed = JSON.parse(settings.favoriteEmojisJson)
+                if (Array.isArray(parsed)) {
+                    favoriteEmojis = parsed.map(item => {
+                        if (item && item.type === "gif") {
+                            let r = item.aspectRatio
+                            if (isNaN(r) || !r || r <= 0) item.aspectRatio = 1.0
+                        }
+                        return item
+                    })
+                    return
+                }
             }
+            favoriteEmojis = []
         } catch (e) {
             console.log("Failed to load favorite emojis:", e)
             favoriteEmojis = []
@@ -453,7 +514,7 @@ Item {
         try {
             settings.recentEmojisJson = "[]"
         } catch (e) {
-            console.log("Failed to clear recent emojis:", e)
+            console.log("Failed to clear recents:", e)
         }
         updateFilteredEmojis()
     }
@@ -463,7 +524,7 @@ Item {
         try {
             settings.favoriteEmojisJson = "[]"
         } catch (e) {
-            console.log("Failed to clear favorite emojis:", e)
+            console.log("Failed to clear favorites:", e)
         }
         updateFilteredEmojis()
     }
@@ -515,10 +576,9 @@ Item {
         } else if (selectedCategory === catFavorites) {
             result = favoriteEmojis
         } else if (selectedCategory === catEmojiKitchen) {
-            const bases = Object.keys(KitchenMetadata.kitchenMetadata);
-            result = emojiList.filter(e => bases.includes(getCodepoint(e.emoji)));
+            result = kitchenEmojiList
         } else if (selectedCategory !== catAll) {
-            result = emojiList.filter(e => e.group === selectedCategory)
+            result = emojiByGroup[selectedCategory] || []
         }
 
         if (filter && filter.trim() !== "") {
@@ -555,7 +615,6 @@ Item {
 
     onFilteredEmojisChanged: {
         _updateActiveSubLists()
-        _updateActiveGifCols(3)
 
         if (fullRoot.filter && fullRoot.filter.length > 0 && fullRoot.filteredEmojis.length > 0) {
             const firstItem = fullRoot.filteredEmojis[0]
@@ -2262,12 +2321,17 @@ Item {
                                         }
                                     }
                                     
+                                    HoverHandler {
+                                        id: resultSlotHover
+                                        cursorShape: kitchenView.currentValidUrl !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    }
+
                                     MouseArea {
                                         id: resultSlotArea
                                         anchors.fill: parent
                                         enabled: kitchenView.currentValidUrl !== ""
-                                        hoverEnabled: true
-                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        acceptedButtons: Qt.LeftButton
+                                        cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             resultSlot.forceActiveFocus()
                                             kitchenView.copyResult()
@@ -2279,12 +2343,19 @@ Item {
                                         anchors.right: parent.right
                                         anchors.margins: 4
                                         icon.name: fullRoot.isFavoriteItem("kitchen", { url: kitchenView.currentValidUrl }) ? "bookmarks-bookmarked" : "bookmarks"
-                                        visible: resultSlotArea.containsMouse && kitchenView.currentValidUrl !== ""
+                                        visible: resultSlotHover.hovered && kitchenView.currentValidUrl !== ""
                                         width: 24
                                         height: 24
                                         display: PlasmaComponents.ToolButton.IconOnly
                                         z: 10
-                                        
+                                        background: Rectangle {
+                                            color: Kirigami.Theme.backgroundColor
+                                            opacity: 0.85
+                                            radius: width / 2
+                                            border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                            border.width: 1
+                                        }
+
                                         onClicked: {
                                             fullRoot.toggleFavoriteItem("kitchen", {
                                                 url: kitchenView.currentValidUrl,
@@ -2769,8 +2840,18 @@ Item {
                         id: gifDelegate
 
                         PC3.ItemDelegate {
+                            id: delegateItem
                             width: masonryRow.columnWidth
-                            height: Math.floor(width / model.aspectRatio)
+                            height: Math.floor(width / (model.aspectRatio || 1.0))
+
+                            readonly property bool inView: {
+                                if (!fullRoot.isWidgetExpanded) return false
+                                if (typeof gifFlickable === "undefined" || !gifFlickable) return false
+                                // Force dependency on contentY and height
+                                var dummy = gifFlickable.contentY + gifFlickable.height
+                                var absY = y + parent.y + masonryRow.y
+                                return (absY + height >= gifFlickable.contentY - 200) && (absY <= gifFlickable.contentY + gifFlickable.height + 200)
+                            }
 
                             onClicked: {
                                 gifView.copyGif(model.rawUrl, model.title, model.webpUrl, model.previewUrl, model.aspectRatio)
@@ -2779,10 +2860,50 @@ Item {
                                 }
                             }
 
-                            MouseArea {
-                                anchors.fill: parent
+
+                            HoverHandler {
+                                id: gifDelegateHover
                                 cursorShape: Qt.PointingHandCursor
-                                acceptedButtons: Qt.NoButton
+                                onHoveredChanged: {
+                                    if (hovered) {
+                                        fullRoot.hoveredGifTitle = model.title
+                                        fullRoot.hoveredGifUrl = model.previewUrl
+                                    } else {
+                                        if (fullRoot.hoveredGifUrl === model.previewUrl) {
+                                            fullRoot.hoveredGifTitle = ""
+                                            fullRoot.hoveredGifUrl = ""
+                                        }
+                                    }
+                                }
+                            }
+
+                            PlasmaComponents.ToolButton {
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.margins: 6
+                                icon.name: fullRoot.isFavoriteItem("gif", { rawUrl: model.rawUrl }) ? "bookmarks-bookmarked" : "bookmarks"
+                                visible: gifDelegateHover.hovered
+                                width: 28
+                                height: 28
+                                display: PlasmaComponents.ToolButton.IconOnly
+                                z: 10
+                                background: Rectangle {
+                                    color: Kirigami.Theme.backgroundColor
+                                    opacity: 0.85
+                                    radius: width / 2
+                                    border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                    border.width: 1
+                                }
+
+                                onClicked: {
+                                    fullRoot.toggleFavoriteItem("gif", {
+                                        rawUrl: model.rawUrl,
+                                        title: model.title,
+                                        webpUrl: model.webpUrl || model.rawUrl,
+                                        previewUrl: model.previewUrl,
+                                        aspectRatio: model.aspectRatio
+                                    })
+                                }
                             }
 
                             background: Rectangle {
@@ -2790,55 +2911,18 @@ Item {
                                 anchors.margins: 2
                                 color: Kirigami.Theme.alternateBackgroundColor
                                 radius: 6
-                                border.width: gifHoverHandler.hovered ? 2 : 0
+                                border.width: gifDelegateHover.hovered ? 2 : 0
                                 border.color: Kirigami.Theme.highlightColor
 
                                 AnimatedImage {
                                     id: gifImage
-                                    source: model.previewUrl
+                                    source: delegateItem.inView ? model.previewUrl : ""
                                     anchors.fill: parent
-                                    anchors.margins: gifHoverHandler.hovered ? 1 : 2
+                                    anchors.margins: gifDelegateHover.hovered ? 1 : 2
                                     fillMode: Image.Stretch
-                                    playing: gifHoverHandler.hovered
-                                    paused: !gifHoverHandler.hovered
+                                    playing: gifDelegateHover.hovered
+                                    paused: !gifDelegateHover.hovered
                                     cache: true
-                                }
-
-                                HoverHandler {
-                                    id: gifHoverHandler
-                                    onHoveredChanged: {
-                                        if (hovered) {
-                                            fullRoot.hoveredGifTitle = model.title
-                                            fullRoot.hoveredGifUrl = model.previewUrl
-                                        } else {
-                                            if (fullRoot.hoveredGifUrl === model.previewUrl) {
-                                                fullRoot.hoveredGifTitle = ""
-                                                fullRoot.hoveredGifUrl = ""
-                                            }
-                                        }
-                                    }
-                                }
-
-                                PlasmaComponents.ToolButton {
-                                    anchors.top: parent.top
-                                    anchors.right: parent.right
-                                    anchors.margins: 4
-                                    icon.name: fullRoot.isFavoriteItem("gif", { rawUrl: model.rawUrl }) ? "bookmarks-bookmarked" : "bookmarks"
-                                    visible: gifHoverHandler.hovered
-                                    width: 24
-                                    height: 24
-                                    display: PlasmaComponents.ToolButton.IconOnly
-                                    z: 10
-                                    
-                                    onClicked: {
-                                        fullRoot.toggleFavoriteItem("gif", {
-                                            rawUrl: model.rawUrl,
-                                            title: model.title,
-                                            webpUrl: model.webpUrl || model.rawUrl,
-                                            previewUrl: model.previewUrl,
-                                            aspectRatio: model.aspectRatio
-                                        })
-                                    }
                                 }
                             }
                         }
@@ -3320,13 +3404,60 @@ Item {
                     id: favRecGifDelegate
 
                     PC3.ItemDelegate {
-                        width: parent.parent.width
-                        height: Math.floor(width / modelData.aspectRatio)
+                        id: favRecDelegateItem
+                        width: favRecentsMasonryRow.columnWidth
+                        height: Math.floor(width / (modelData.aspectRatio || 1.0))
 
                         onClicked: {
-                            gifView.copyGif(modelData.rawUrl, modelData.title, modelData.webpUrl, modelData.previewUrl, modelData.aspectRatio)
+                            gifView.copyGif(modelData.rawUrl, modelData.title, modelData.webpUrl, modelData.previewUrl, modelData.aspectRatio || 1.0)
                             if (plasmoid.configuration.CloseAfterSelection) {
                                     if (fullRoot.plasmoidItem) fullRoot.plasmoidItem.expanded = false
+                            }
+                        }
+
+                        HoverHandler {
+                            id: favRecGifDelegateHover
+                            cursorShape: Qt.PointingHandCursor
+                            onHoveredChanged: {
+                                if (hovered) {
+                                    fullRoot.hoveredGifTitle = modelData.title
+                                    fullRoot.hoveredGifUrl = modelData.previewUrl
+                                } else {
+                                    if (fullRoot.hoveredGifUrl === modelData.previewUrl) {
+                                        fullRoot.hoveredGifTitle = ""
+                                        fullRoot.hoveredGifUrl = ""
+                                    }
+                                }
+                            }
+                        }
+
+                        PlasmaComponents.ToolButton {
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            anchors.margins: 6
+                            icon.name: fullRoot.isFavoriteItem("gif", { rawUrl: modelData.rawUrl }) ? "bookmarks-bookmarked" : "bookmarks"
+                            visible: favRecGifDelegateHover.hovered
+                            width: 28
+                            height: 28
+                            display: PlasmaComponents.ToolButton.IconOnly
+                            z: 10
+
+                            background: Rectangle {
+                                color: Kirigami.Theme.backgroundColor
+                                opacity: 0.85
+                                radius: width / 2
+                                border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                border.width: 1
+                            }
+
+                            onClicked: {
+                                fullRoot.toggleFavoriteItem("gif", {
+                                    rawUrl: modelData.rawUrl,
+                                    title: modelData.title,
+                                    webpUrl: modelData.webpUrl || modelData.rawUrl,
+                                    previewUrl: modelData.previewUrl,
+                                    aspectRatio: modelData.aspectRatio
+                                })
                             }
                         }
 
@@ -3335,54 +3466,17 @@ Item {
                             anchors.margins: 2
                             color: Kirigami.Theme.alternateBackgroundColor
                             radius: 6
-                            border.width: favRecGifHoverHandler.hovered ? 2 : 0
+                            border.width: favRecGifDelegateHover.hovered ? 2 : 0
                             border.color: Kirigami.Theme.highlightColor
 
                             AnimatedImage {
-                                source: modelData.previewUrl
+                                source: fullRoot.isWidgetExpanded ? modelData.previewUrl : ""
                                 anchors.fill: parent
-                                anchors.margins: favRecGifHoverHandler.hovered ? 1 : 2
+                                anchors.margins: favRecGifDelegateHover.hovered ? 1 : 2
                                 fillMode: Image.Stretch
-                                playing: favRecGifHoverHandler.hovered
-                                paused: !favRecGifHoverHandler.hovered
+                                playing: favRecGifDelegateHover.hovered
+                                paused: !favRecGifDelegateHover.hovered
                                 cache: true
-                            }
-
-                            HoverHandler {
-                                id: favRecGifHoverHandler
-                                onHoveredChanged: {
-                                    if (hovered) {
-                                        fullRoot.hoveredGifTitle = modelData.title
-                                        fullRoot.hoveredGifUrl = modelData.previewUrl
-                                    } else {
-                                        if (fullRoot.hoveredGifUrl === modelData.previewUrl) {
-                                            fullRoot.hoveredGifTitle = ""
-                                            fullRoot.hoveredGifUrl = ""
-                                        }
-                                    }
-                                }
-                            }
-
-                            PlasmaComponents.ToolButton {
-                                anchors.top: parent.top
-                                anchors.right: parent.right
-                                anchors.margins: 4
-                                icon.name: fullRoot.isFavoriteItem("gif", { rawUrl: modelData.rawUrl }) ? "bookmarks-bookmarked" : "bookmarks"
-                                visible: favRecGifHoverHandler.hovered
-                                width: 24
-                                height: 24
-                                display: PlasmaComponents.ToolButton.IconOnly
-                                z: 10
-
-                                onClicked: {
-                                    fullRoot.toggleFavoriteItem("gif", {
-                                        rawUrl: modelData.rawUrl,
-                                        title: modelData.title,
-                                        webpUrl: modelData.webpUrl || modelData.rawUrl,
-                                        previewUrl: modelData.previewUrl,
-                                        aspectRatio: modelData.aspectRatio
-                                    })
-                                }
                             }
                         }
                     }
@@ -3426,22 +3520,21 @@ Item {
                         }
                     }
 
-                    ColumnLayout {
+                    Column {
+                        id: favRecentsMainLayout
+                        x: 8
+                        y: 8
                         width: favRecentsView.width - 16
                         spacing: 16
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.leftMargin: 8
-                        anchors.topMargin: 8
 
                         // ================= EMOJIS SECTION =================
-                        ColumnLayout {
-                            Layout.fillWidth: true
+                        Column {
+                            width: parent.width
                             spacing: 8
                             visible: favRecentsView.countEmojis > 0
 
                             Item {
-                                Layout.fillWidth: true
+                                width: parent.width
                                 height: 32
 
                                 Rectangle {
@@ -3503,7 +3596,7 @@ Item {
                             }
 
                             Flow {
-                                Layout.fillWidth: true
+                                width: parent.width
                                 spacing: 4
                                 visible: favRecentsView.isEmojisExpanded
 
@@ -3573,13 +3666,13 @@ Item {
                         }
 
                         // ================= GIFS SECTION =================
-                        ColumnLayout {
-                            Layout.fillWidth: true
+                        Column {
+                            width: parent.width
                             spacing: 8
                             visible: favRecentsView.countGifs > 0
 
                             Item {
-                                Layout.fillWidth: true
+                                width: parent.width
                                 height: 32
 
                                 Rectangle {
@@ -3640,20 +3733,18 @@ Item {
                                 }
                             }
 
-                            RowLayout {
+                            Row {
                                 id: favRecentsMasonryRow
-                                Layout.fillWidth: true
+                                width: parent.width
                                 spacing: 6
                                 visible: favRecentsView.isGifsExpanded
 
-                                readonly property int numColumns: width > 360 ? 3 : 2
+                                readonly property int numColumns: fullRoot.favRecentsNumColumns
                                 readonly property int columnWidth: Math.floor((width - (numColumns - 1) * spacing) / numColumns)
 
-                                ColumnLayout {
+                                Column {
                                     spacing: 6
-                                    Layout.fillHeight: false
-                                    Layout.alignment: Qt.AlignTop
-                                    Layout.preferredWidth: parent.columnWidth
+                                    width: favRecentsMasonryRow.columnWidth
 
                                     Repeater {
                                         model: fullRoot.activeGifCol0
@@ -3661,11 +3752,9 @@ Item {
                                     }
                                 }
 
-                                ColumnLayout {
+                                Column {
                                     spacing: 6
-                                    Layout.fillHeight: false
-                                    Layout.alignment: Qt.AlignTop
-                                    Layout.preferredWidth: parent.columnWidth
+                                    width: favRecentsMasonryRow.columnWidth
 
                                     Repeater {
                                         model: fullRoot.activeGifCol1
@@ -3673,12 +3762,10 @@ Item {
                                     }
                                 }
 
-                                ColumnLayout {
+                                Column {
                                     spacing: 6
-                                    Layout.fillHeight: false
-                                    Layout.alignment: Qt.AlignTop
-                                    Layout.preferredWidth: parent.columnWidth
-                                    visible: parent.numColumns === 3
+                                    width: favRecentsMasonryRow.columnWidth
+                                    visible: favRecentsMasonryRow.numColumns === 3
 
                                     Repeater {
                                         model: fullRoot.activeGifCol2
@@ -3689,13 +3776,13 @@ Item {
                         }
 
                         // ================= EMOJI KITCHEN SECTION =================
-                        ColumnLayout {
-                            Layout.fillWidth: true
+                        Column {
+                            width: parent.width
                             spacing: 8
                             visible: favRecentsView.countKitchen > 0
 
                             Item {
-                                Layout.fillWidth: true
+                                width: parent.width
                                 height: 32
 
                                 Rectangle {
@@ -3757,7 +3844,7 @@ Item {
                             }
 
                             Flow {
-                                Layout.fillWidth: true
+                                width: parent.width
                                 spacing: 8
                                 visible: favRecentsView.isKitchenExpanded
 
@@ -3779,8 +3866,10 @@ Item {
                                                 anchors.fill: parent
                                                 anchors.margins: 4
                                                 source: modelData.url
+                                                sourceSize: Qt.size(256, 256)
                                                 fillMode: Image.PreserveAspectFit
                                                 smooth: true
+                                                mipmap: true
                                             }
 
                                             HoverHandler {
@@ -3815,6 +3904,14 @@ Item {
                                                 height: 18
                                                 display: PlasmaComponents.ToolButton.IconOnly
                                                 z: 10
+
+                                                background: Rectangle {
+                                                    color: Kirigami.Theme.backgroundColor
+                                                    opacity: 0.85
+                                                    radius: width / 2
+                                                    border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                                    border.width: 1
+                                                }
 
                                                 onClicked: {
                                                     fullRoot.toggleFavoriteItem("kitchen", modelData)
@@ -3956,11 +4053,11 @@ Item {
     PC3.Menu {
         id: recentContextMenu
         PC3.MenuItem {
-            text: i18n("Clear Recent Emojis")
+            text: i18n("Clear Recents")
             icon.name: "edit-clear"
             onClicked: {
                 clearRecentEmojis()
-                showSearchTemporaryMessage(i18n("Cleared recent emojis"))
+                showSearchTemporaryMessage(i18n("Cleared recents"))
             }
         }
     }
@@ -3968,11 +4065,11 @@ Item {
     PC3.Menu {
         id: favoritesContextMenu
         PC3.MenuItem {
-            text: i18n("Clear Favorite Emojis")
+            text: i18n("Clear Favorites")
             icon.name: "edit-clear"
             onClicked: {
                 clearFavoriteEmojis()
-                showSearchTemporaryMessage(i18n("Cleared favorite emojis"))
+                showSearchTemporaryMessage(i18n("Cleared favorites"))
             }
         }
     }
