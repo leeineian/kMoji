@@ -814,21 +814,41 @@ PlasmoidItem {
             }
 
             function clearRecentEmojis() {
-                recentEmojis = [];
+                recentEmojis = recentEmojis.filter(e => e.type === "gif");
                 try {
-                    settings.recentEmojisJson = "[]";
+                    settings.recentEmojisJson = JSON.stringify(recentEmojis);
                 } catch (e) {
-                    console.log("Failed to clear recents:", e);
+                    console.log("Failed to clear recent emojis:", e);
                 }
                 updateFilteredEmojis();
             }
 
             function clearFavoriteEmojis() {
-                favoriteEmojis = [];
+                favoriteEmojis = favoriteEmojis.filter(e => e.type === "gif");
                 try {
-                    settings.favoriteEmojisJson = "[]";
+                    settings.favoriteEmojisJson = JSON.stringify(favoriteEmojis);
                 } catch (e) {
-                    console.log("Failed to clear favorites:", e);
+                    console.log("Failed to clear favorite emojis:", e);
+                }
+                updateFilteredEmojis();
+            }
+
+            function clearRecentGifs() {
+                recentEmojis = recentEmojis.filter(e => e.type !== "gif");
+                try {
+                    settings.recentEmojisJson = JSON.stringify(recentEmojis);
+                } catch (e) {
+                    console.log("Failed to clear recent GIFs:", e);
+                }
+                updateFilteredEmojis();
+            }
+
+            function clearFavoriteGifs() {
+                favoriteEmojis = favoriteEmojis.filter(e => e.type !== "gif");
+                try {
+                    settings.favoriteEmojisJson = JSON.stringify(favoriteEmojis);
+                } catch (e) {
+                    console.log("Failed to clear favorite GIFs:", e);
                 }
                 updateFilteredEmojis();
             }
@@ -2197,10 +2217,10 @@ PlasmoidItem {
                                         onClicked: {
                                             if (mouse.button === Qt.RightButton) {
                                                 var globalPos = mapToItem(fullRoot, mouse.x, mouse.y);
-                                                if (model.name === catRecent) {
-                                                    recentContextMenu.popup(globalPos.x, globalPos.y);
-                                                } else if (model.name === catFavorites) {
-                                                    favoritesContextMenu.popup(globalPos.x, globalPos.y);
+                                                if (model.name === fullRoot.catGifs) {
+                                                    gifSidebarContextMenu.popup(globalPos.x, globalPos.y);
+                                                } else {
+                                                    emojiSidebarContextMenu.popup(globalPos.x, globalPos.y);
                                                 }
                                                 mouse.accepted = true;
                                             } else if (fullRoot.draggedCategoryIndex !== index) {
@@ -3737,7 +3757,7 @@ PlasmoidItem {
                                                 id: catHeaderMouse
                                                 anchors.fill: parent
                                                 hoverEnabled: true
-                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                acceptedButtons: Qt.LeftButton
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: function(mouse) {
                                                     if (mouse.button === Qt.LeftButton) {
@@ -3745,13 +3765,6 @@ PlasmoidItem {
                                                         allEmojisView.toggleCategory(catName);
                                                         if (!currentlyExpanded) {
                                                             allEmojisView.scrollToCategory(catName);
-                                                        }
-                                                    } else if (mouse.button === Qt.RightButton) {
-                                                        var globalPos = catHeaderMouse.mapToItem(fullRoot, mouse.x, mouse.y);
-                                                        if (catName === "Recent") {
-                                                            recentContextMenu.popup(globalPos.x, globalPos.y);
-                                                        } else if (catName === "Favorites") {
-                                                            favoritesContextMenu.popup(globalPos.x, globalPos.y);
                                                         }
                                                     }
                                                 }
@@ -4635,25 +4648,41 @@ PlasmoidItem {
             }
 
             PC3.Menu {
-                id: recentContextMenu
+                id: emojiSidebarContextMenu
                 PC3.MenuItem {
-                    text: i18n("Clear Recents")
+                    text: i18n("Clear Favorite Emojis")
+                    icon.name: "edit-clear"
+                    onClicked: {
+                        clearFavoriteEmojis();
+                        showSearchTemporaryMessage(i18n("Cleared favorite emojis"));
+                    }
+                }
+                PC3.MenuItem {
+                    text: i18n("Clear Recent Emojis")
                     icon.name: "edit-clear"
                     onClicked: {
                         clearRecentEmojis();
-                        showSearchTemporaryMessage(i18n("Cleared recents"));
+                        showSearchTemporaryMessage(i18n("Cleared recent emojis"));
                     }
                 }
             }
 
             PC3.Menu {
-                id: favoritesContextMenu
+                id: gifSidebarContextMenu
                 PC3.MenuItem {
-                    text: i18n("Clear Favorites")
+                    text: i18n("Clear Favorite GIFs")
                     icon.name: "edit-clear"
                     onClicked: {
-                        clearFavoriteEmojis();
-                        showSearchTemporaryMessage(i18n("Cleared favorites"));
+                        clearFavoriteGifs();
+                        showSearchTemporaryMessage(i18n("Cleared favorite GIFs"));
+                    }
+                }
+                PC3.MenuItem {
+                    text: i18n("Clear Recent GIFs")
+                    icon.name: "edit-clear"
+                    onClicked: {
+                        clearRecentGifs();
+                        showSearchTemporaryMessage(i18n("Cleared recent GIFs"));
                     }
                 }
             }
