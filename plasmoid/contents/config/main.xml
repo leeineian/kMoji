@@ -28,6 +28,11 @@
       <default>false</default>
     </entry>
 
+    <entry name="AlwaysAnimateGifs" type="Bool">
+      <label>Always animate GIFs</label>
+      <default>false</default>
+    </entry>
+
     <entry name="KlipyApiKey" type="String">
       <label>Klipy API Key</label>
       <default>c9d81d227b0b4b2fb4e0bd6f6e52003c</default>

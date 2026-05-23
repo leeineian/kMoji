@@ -58,6 +58,7 @@ Item {
     property string emojiHoveredEmojiKey: ""
     property string emojiLastHoveredEmojiKey: ""
     property bool emojiKeyboardNavigationEnabled: plasmoid.configuration.KeyboardNavigation
+    property bool alwaysAnimateGifs: plasmoid.configuration.AlwaysAnimateGifs
     property Item emojiTabNextTarget: searchField
     property Item currentGridView: {
         if (selectedCategory === catEmojiKitchen) return kitchenView;
@@ -109,11 +110,11 @@ Item {
 
     // Default Categories
     property var defaultCategoryOrder: [
-        { name: catEmojiKitchen, displayName: i18n("Emoji Kitchen"), icon: "path-union-symbolic" },
-        { name: catGifs,         displayName: i18n("GIFs"),   icon: "fileview-preview-symbolic" },
-        { name: catAll,       displayName: i18n("All"),       icon: "view-list-icons" },
-        { name: catFavorites, displayName: i18n("Favorites"), icon: "bookmarks-bookmarked" },
-        { name: catRecent,    displayName: i18n("Recent"),    icon: "chronometer" },
+        { name: catFavorites,        displayName: i18n("Favorites"),         icon: "bookmarks-bookmarked" },
+        { name: catRecent,           displayName: i18n("Recent"),            icon: "chronometer" },
+        { name: catGifs,             displayName: i18n("GIFs"),              icon: "fileview-preview-symbolic" },
+        { name: catEmojiKitchen,     displayName: i18n("Emoji Kitchen"),     icon: "path-union-symbolic" },
+        { name: catAll,              displayName: i18n("All"),               icon: "view-list-icons" },
         { name: "Smileys & Emotion", displayName: i18n("Smileys & Emotion"), icon: "smiley" },
         { name: "People & Body",     displayName: i18n("People & Body"),     icon: "im-user" },
         { name: "Animals & Nature",  displayName: i18n("Animals & Nature"),  icon: "animal" },
@@ -186,10 +187,6 @@ Item {
     onFavRecentsNumColumnsChanged: _updateActiveGifCols(favRecentsNumColumns)
 
     function _updateActiveGifCols(numCols) {
-        if (_lastNumCols === numCols && activeGifs.length === (activeGifCol0.length + activeGifCol1.length + activeGifCol2.length)) {
-            // Guard: no change in column structure or total count, skip recreating arrays to prevent delegate destruction loops!
-            return
-        }
         _lastNumCols = numCols
 
         const gifs = activeGifs
@@ -200,6 +197,11 @@ Item {
             else if (col === 1) c1.push(gifs[i])
             else c2.push(gifs[i])
         }
+
+        _syncListModel(favGifCol0Model, c0, "rawUrl")
+        _syncListModel(favGifCol1Model, c1, "rawUrl")
+        _syncListModel(favGifCol2Model, numCols >= 3 ? c2 : [], "rawUrl")
+
         activeGifCol0 = c0
         activeGifCol1 = c1
         activeGifCol2 = numCols >= 3 ? c2 : []
@@ -211,7 +213,6 @@ Item {
         if (colIndex === 1) return activeGifCol1
         return activeGifCol2
     }
-
 
     // Grid State
     property bool gridIsMouseOver: false
@@ -918,6 +919,45 @@ Item {
         plasmoid.configuration.CategoryOrder = JSON.stringify(order)
     }
 
+    function _syncListModel(listModel, targetArray, keyField) {
+        // 1. Remove items from listModel that are not in targetArray
+        for (let i = listModel.count - 1; i >= 0; i--) {
+            const modelItem = listModel.get(i)
+            const key = modelItem[keyField]
+            const exists = targetArray.some(item => item[keyField] === key)
+            if (!exists) {
+                listModel.remove(i)
+            }
+        }
+
+        // 2. Insert, move or update items
+        for (let i = 0; i < targetArray.length; i++) {
+            const targetItem = targetArray[i]
+            const key = targetItem[keyField]
+            
+            let foundIndex = -1
+            for (let j = 0; j < listModel.count; j++) {
+                if (listModel.get(j)[keyField] === key) {
+                    foundIndex = j
+                    break
+                }
+            }
+
+            if (foundIndex === -1) {
+                listModel.insert(i, targetItem)
+            } else if (foundIndex !== i) {
+                listModel.move(foundIndex, i, 1)
+            } else {
+                const modelItem = listModel.get(i)
+                for (let prop in targetItem) {
+                    if (modelItem[prop] !== targetItem[prop]) {
+                        listModel.setProperty(i, prop, targetItem[prop])
+                    }
+                }
+            }
+        }
+    }
+
     function getSearchPlaceholder() {
         if (fullRoot.selectedCategory === catGifs) {
             return i18n("Search GIFs...")
@@ -1109,6 +1149,10 @@ Item {
     ListModel {
         id: categoryModel
     }
+
+    ListModel { id: favGifCol0Model }
+    ListModel { id: favGifCol1Model }
+    ListModel { id: favGifCol2Model }
 
     Timer {
         id: pastePlaceholderResetTimer
@@ -2349,10 +2393,12 @@ Item {
                                         display: PlasmaComponents.ToolButton.IconOnly
                                         z: 10
                                         background: Rectangle {
-                                            color: Kirigami.Theme.backgroundColor
-                                            opacity: 0.85
-                                            radius: width / 2
-                                            border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                            color: parent.pressed ? Kirigami.Theme.highlightColor : 
+                                                   (parent.hovered ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.35) : 
+                                                    Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.85))
+                                            radius: 4
+                                            border.color: (parent.pressed || parent.hovered) ? Kirigami.Theme.highlightColor : 
+                                                          Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
                                             border.width: 1
                                         }
 
@@ -2888,10 +2934,12 @@ Item {
                                 display: PlasmaComponents.ToolButton.IconOnly
                                 z: 10
                                 background: Rectangle {
-                                    color: Kirigami.Theme.backgroundColor
-                                    opacity: 0.85
-                                    radius: width / 2
-                                    border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                    color: parent.pressed ? Kirigami.Theme.highlightColor : 
+                                           (parent.hovered ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.35) : 
+                                            Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.85))
+                                    radius: 4
+                                    border.color: (parent.pressed || parent.hovered) ? Kirigami.Theme.highlightColor : 
+                                                  Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
                                     border.width: 1
                                 }
 
@@ -2920,8 +2968,8 @@ Item {
                                     anchors.fill: parent
                                     anchors.margins: gifDelegateHover.hovered ? 1 : 2
                                     fillMode: Image.Stretch
-                                    playing: gifDelegateHover.hovered
-                                    paused: !gifDelegateHover.hovered
+                                    playing: alwaysAnimateGifs || gifDelegateHover.hovered
+                                    paused: !playing
                                     cache: true
                                 }
                             }
@@ -3405,6 +3453,7 @@ Item {
 
                     PC3.ItemDelegate {
                         id: favRecDelegateItem
+                        readonly property var modelData: model
                         width: favRecentsMasonryRow.columnWidth
                         height: Math.floor(width / (modelData.aspectRatio || 1.0))
 
@@ -3443,10 +3492,12 @@ Item {
                             z: 10
 
                             background: Rectangle {
-                                color: Kirigami.Theme.backgroundColor
-                                opacity: 0.85
-                                radius: width / 2
-                                border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                color: parent.pressed ? Kirigami.Theme.highlightColor : 
+                                       (parent.hovered ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.35) : 
+                                        Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.85))
+                                radius: 4
+                                border.color: (parent.pressed || parent.hovered) ? Kirigami.Theme.highlightColor : 
+                                              Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
                                 border.width: 1
                             }
 
@@ -3474,8 +3525,8 @@ Item {
                                 anchors.fill: parent
                                 anchors.margins: favRecGifDelegateHover.hovered ? 1 : 2
                                 fillMode: Image.Stretch
-                                playing: favRecGifDelegateHover.hovered
-                                paused: !favRecGifDelegateHover.hovered
+                                playing: alwaysAnimateGifs || favRecGifDelegateHover.hovered
+                                paused: !playing
                                 cache: true
                             }
                         }
@@ -3553,8 +3604,8 @@ Item {
 
                                     Kirigami.Icon {
                                         source: favRecentsView.isEmojisExpanded ? "go-down" : "go-next"
-                                        width: 16
-                                        height: 16
+                                        width: 4
+                                        height: 4
                                     }
 
                                     PlasmaComponents.Label {
@@ -3567,8 +3618,7 @@ Item {
                                         width: emojiCountLabel.contentWidth + 12
                                         height: 18
                                         radius: 9
-                                        color: Kirigami.Theme.highlightColor
-                                        opacity: 0.2
+                                        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
 
                                         PlasmaComponents.Label {
                                             id: emojiCountLabel
@@ -3691,8 +3741,8 @@ Item {
 
                                     Kirigami.Icon {
                                         source: favRecentsView.isGifsExpanded ? "go-down" : "go-next"
-                                        width: 16
-                                        height: 16
+                                        width: 4
+                                        height: 4
                                     }
 
                                     PlasmaComponents.Label {
@@ -3705,8 +3755,7 @@ Item {
                                         width: gifCountLabel.contentWidth + 12
                                         height: 18
                                         radius: 9
-                                        color: Kirigami.Theme.highlightColor
-                                        opacity: 0.2
+                                        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
 
                                         PlasmaComponents.Label {
                                             id: gifCountLabel
@@ -3747,7 +3796,7 @@ Item {
                                     width: favRecentsMasonryRow.columnWidth
 
                                     Repeater {
-                                        model: fullRoot.activeGifCol0
+                                        model: favGifCol0Model
                                         delegate: favRecGifDelegate
                                     }
                                 }
@@ -3757,7 +3806,7 @@ Item {
                                     width: favRecentsMasonryRow.columnWidth
 
                                     Repeater {
-                                        model: fullRoot.activeGifCol1
+                                        model: favGifCol1Model
                                         delegate: favRecGifDelegate
                                     }
                                 }
@@ -3768,7 +3817,7 @@ Item {
                                     visible: favRecentsMasonryRow.numColumns === 3
 
                                     Repeater {
-                                        model: fullRoot.activeGifCol2
+                                        model: favGifCol2Model
                                         delegate: favRecGifDelegate
                                     }
                                 }
@@ -3801,8 +3850,8 @@ Item {
 
                                     Kirigami.Icon {
                                         source: favRecentsView.isKitchenExpanded ? "go-down" : "go-next"
-                                        width: 16
-                                        height: 16
+                                        width: 4
+                                        height: 4
                                     }
 
                                     PlasmaComponents.Label {
@@ -3815,8 +3864,7 @@ Item {
                                         width: kitchenCountLabel.contentWidth + 12
                                         height: 18
                                         radius: 9
-                                        color: Kirigami.Theme.highlightColor
-                                        opacity: 0.2
+                                        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
 
                                         PlasmaComponents.Label {
                                             id: kitchenCountLabel
@@ -3906,10 +3954,12 @@ Item {
                                                 z: 10
 
                                                 background: Rectangle {
-                                                    color: Kirigami.Theme.backgroundColor
-                                                    opacity: 0.85
-                                                    radius: width / 2
-                                                    border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                                    color: parent.pressed ? Kirigami.Theme.highlightColor : 
+                                                           (parent.hovered ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.35) : 
+                                                            Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.85))
+                                                    radius: 3
+                                                    border.color: (parent.pressed || parent.hovered) ? Kirigami.Theme.highlightColor : 
+                                                                  Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
                                                     border.width: 1
                                                 }
 

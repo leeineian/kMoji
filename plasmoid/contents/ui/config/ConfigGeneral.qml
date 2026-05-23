@@ -24,6 +24,7 @@ Kirigami.ScrollablePage {
     property alias cfg_CloseAfterSelection: closeAfterSelection.checked
     property alias cfg_KeyboardNavigation: keyboardNavigation.checked
     property alias cfg_AlwaysOpen: alwaysOpen.checked
+    property alias cfg_AlwaysAnimateGifs: alwaysAnimateGifs.checked
     property alias cfg_KlipyApiKey: klipyApiKey.text
 
     function emojiFontPixelSize(gridSize) {
@@ -143,6 +144,11 @@ Kirigami.ScrollablePage {
             PlasmaComponents.CheckBox {
                 id: closeAfterSelection
                 text: i18n("Close popup after emoji selection")
+            }
+
+            PlasmaComponents.CheckBox {
+                id: alwaysAnimateGifs
+                text: i18n("Always animate GIFs")
             }
 
             RowLayout {
