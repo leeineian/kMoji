@@ -1179,6 +1179,78 @@ Item {
         id: clipboard
     }
 
+    component CategoryHeader: Item {
+        id: headerRoot
+        width: parent.width
+        height: 32
+
+        property bool isExpanded: false
+        property string title: ""
+        property int count: 0
+        signal toggled()
+
+        Rectangle {
+            anchors.fill: parent
+            color: Kirigami.Theme.highlightColor
+            opacity: headerMouse.containsMouse ? 0.1 : 0
+            radius: 4
+            Behavior on opacity { NumberAnimation { duration: 150 } }
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 4
+            anchors.rightMargin: 4
+            spacing: 8
+
+            Item {
+                implicitWidth: 16
+                implicitHeight: 16
+                Kirigami.Icon {
+                    anchors.centerIn: parent
+                    source: headerRoot.isExpanded ? "go-down" : "go-next"
+                    width: 16
+                    height: 16
+                }
+            }
+
+            PlasmaComponents.Label {
+                text: headerRoot.title
+                font.bold: true
+                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+            }
+
+            Rectangle {
+                width: countLabel.contentWidth + 12
+                height: 18
+                radius: 9
+                color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
+
+                PlasmaComponents.Label {
+                    id: countLabel
+                    anchors.centerIn: parent
+                    text: headerRoot.count
+                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                    font.bold: true
+                    color: Kirigami.Theme.highlightColor
+                }
+            }
+
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                opacity: 0.3
+            }
+        }
+
+        MouseArea {
+            id: headerMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: headerRoot.toggled()
+        }
+    }
+
     // =========================================================================
     // UI Layout
     // =========================================================================
@@ -3584,65 +3656,11 @@ Item {
                             spacing: 8
                             visible: favRecentsView.countEmojis > 0
 
-                            Item {
-                                width: parent.width
-                                height: 32
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: Kirigami.Theme.highlightColor
-                                    opacity: emojiHeaderMouse.containsMouse ? 0.1 : 0
-                                    radius: 4
-                                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                                }
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 4
-                                    anchors.rightMargin: 4
-                                    spacing: 8
-
-                                    Kirigami.Icon {
-                                        source: favRecentsView.isEmojisExpanded ? "go-down" : "go-next"
-                                        width: 4
-                                        height: 4
-                                    }
-
-                                    PlasmaComponents.Label {
-                                        text: i18n("Emojis")
-                                        font.bold: true
-                                        font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
-                                    }
-
-                                    Rectangle {
-                                        width: emojiCountLabel.contentWidth + 12
-                                        height: 18
-                                        radius: 9
-                                        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
-
-                                        PlasmaComponents.Label {
-                                            id: emojiCountLabel
-                                            anchors.centerIn: parent
-                                            text: favRecentsView.countEmojis
-                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                            font.bold: true
-                                            color: Kirigami.Theme.highlightColor
-                                        }
-                                    }
-
-                                    Kirigami.Separator {
-                                        Layout.fillWidth: true
-                                        opacity: 0.3
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: emojiHeaderMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: favRecentsView.toggleEmojisExpanded()
-                                }
+                            CategoryHeader {
+                                isExpanded: favRecentsView.isEmojisExpanded
+                                title: i18n("Emojis")
+                                count: favRecentsView.countEmojis
+                                onToggled: favRecentsView.toggleEmojisExpanded()
                             }
 
                             Flow {
@@ -3721,65 +3739,11 @@ Item {
                             spacing: 8
                             visible: favRecentsView.countGifs > 0
 
-                            Item {
-                                width: parent.width
-                                height: 32
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: Kirigami.Theme.highlightColor
-                                    opacity: gifHeaderMouse.containsMouse ? 0.1 : 0
-                                    radius: 4
-                                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                                }
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 4
-                                    anchors.rightMargin: 4
-                                    spacing: 8
-
-                                    Kirigami.Icon {
-                                        source: favRecentsView.isGifsExpanded ? "go-down" : "go-next"
-                                        width: 4
-                                        height: 4
-                                    }
-
-                                    PlasmaComponents.Label {
-                                        text: i18n("GIFs")
-                                        font.bold: true
-                                        font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
-                                    }
-
-                                    Rectangle {
-                                        width: gifCountLabel.contentWidth + 12
-                                        height: 18
-                                        radius: 9
-                                        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
-
-                                        PlasmaComponents.Label {
-                                            id: gifCountLabel
-                                            anchors.centerIn: parent
-                                            text: favRecentsView.countGifs
-                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                            font.bold: true
-                                            color: Kirigami.Theme.highlightColor
-                                        }
-                                    }
-
-                                    Kirigami.Separator {
-                                        Layout.fillWidth: true
-                                        opacity: 0.3
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: gifHeaderMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: favRecentsView.toggleGifsExpanded()
-                                }
+                            CategoryHeader {
+                                isExpanded: favRecentsView.isGifsExpanded
+                                title: i18n("GIFs")
+                                count: favRecentsView.countGifs
+                                onToggled: favRecentsView.toggleGifsExpanded()
                             }
 
                             Row {
@@ -3830,65 +3794,11 @@ Item {
                             spacing: 8
                             visible: favRecentsView.countKitchen > 0
 
-                            Item {
-                                width: parent.width
-                                height: 32
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: Kirigami.Theme.highlightColor
-                                    opacity: kitchenHeaderMouse.containsMouse ? 0.1 : 0
-                                    radius: 4
-                                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                                }
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 4
-                                    anchors.rightMargin: 4
-                                    spacing: 8
-
-                                    Kirigami.Icon {
-                                        source: favRecentsView.isKitchenExpanded ? "go-down" : "go-next"
-                                        width: 4
-                                        height: 4
-                                    }
-
-                                    PlasmaComponents.Label {
-                                        text: i18n("Emoji Kitchen")
-                                        font.bold: true
-                                        font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
-                                    }
-
-                                    Rectangle {
-                                        width: kitchenCountLabel.contentWidth + 12
-                                        height: 18
-                                        radius: 9
-                                        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
-
-                                        PlasmaComponents.Label {
-                                            id: kitchenCountLabel
-                                            anchors.centerIn: parent
-                                            text: favRecentsView.countKitchen
-                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                            font.bold: true
-                                            color: Kirigami.Theme.highlightColor
-                                        }
-                                    }
-
-                                    Kirigami.Separator {
-                                        Layout.fillWidth: true
-                                        opacity: 0.3
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: kitchenHeaderMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: favRecentsView.toggleKitchenExpanded()
-                                }
+                            CategoryHeader {
+                                isExpanded: favRecentsView.isKitchenExpanded
+                                title: i18n("Emoji Kitchen")
+                                count: favRecentsView.countKitchen
+                                onToggled: favRecentsView.toggleKitchenExpanded()
                             }
 
                             Flow {

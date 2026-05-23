@@ -143,7 +143,7 @@ Kirigami.ScrollablePage {
 
             PlasmaComponents.CheckBox {
                 id: closeAfterSelection
-                text: i18n("Close popup after emoji selection")
+                text: i18n("Close popup after selection")
             }
 
             PlasmaComponents.CheckBox {

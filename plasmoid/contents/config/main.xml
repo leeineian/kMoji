@@ -14,7 +14,7 @@
     </entry>
 
     <entry name="CloseAfterSelection" type="Bool">
-      <label>Close popup after emoji selection</label>
+      <label>Close popup after selection</label>
       <default>true</default>
     </entry>
 
