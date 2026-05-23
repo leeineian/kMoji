@@ -13,10 +13,6 @@ import "../assets/emoji-metadata.js" as EmojiList
 Kirigami.ScrollablePage {
     id: root
 
-    // =========================================================================
-    // Properties & Helpers
-    // =========================================================================
-
     property var _cachedEmojis: null
 
     function getIconEmojis(emojiList) {
@@ -97,14 +93,9 @@ Kirigami.ScrollablePage {
         rollSizeEmojiLabels()
     }
 
-    // =========================================================================
-    // Visual Layout
-    // =========================================================================
-
     ColumnLayout {
         spacing: Kirigami.Units.smallSpacing
 
-        // --- Display Section ---
         ConfigSection {
             text: i18n("Display")
         }
@@ -150,7 +141,6 @@ Kirigami.ScrollablePage {
             }
         }
 
-        // --- Behavior Section ---
         ConfigSection {
             text: i18n("Behavior")
         }
@@ -190,8 +180,6 @@ Kirigami.ScrollablePage {
                 }
             }
         }
-
-        // --- Services Section ---
 
         ConfigSection {
             text: i18n("Services")
@@ -303,10 +291,6 @@ Kirigami.ScrollablePage {
             }
         }
     }
-
-    // =========================================================================
-    // Data & Logic
-    // =========================================================================
 
     Plasma5Support.DataSource {
         id: shellSource
@@ -420,10 +404,6 @@ Kirigami.ScrollablePage {
             resetStatusTimer.restart()
         }
     }
-
-    // =========================================================================
-    // Timers
-    // =========================================================================
 
     Timer {
         id: resetStatusTimer
