@@ -290,6 +290,8 @@ PlasmoidItem {
             property var emojiGridView: null
             property var emojiExternalScrollBar: null
             property string emojiHoveredEmojiKey: ""
+            property string emojiHoveredEmojiType: ""
+            property string emojiHoveredKitchenUrl: ""
             property string emojiLastHoveredEmojiKey: ""
             property bool emojiKeyboardNavigationEnabled: plasmoid.configuration.KeyboardNavigation
             property bool alwaysAnimateGifs: plasmoid.configuration.AlwaysAnimateGifs
@@ -339,25 +341,11 @@ PlasmoidItem {
 
             property var defaultCategoryOrder: [
                 {
-                    name: catFavorites,
-                    displayName: i18n("Favorites"),
-                    icon: "bookmarks-bookmarked"
-                },
-                {
-                    name: catRecent,
-                    displayName: i18n("Recent"),
-                    icon: "chronometer"
-                },
-                {
                     name: catGifs,
                     displayName: i18n("GIFs"),
                     icon: "fileview-preview-symbolic"
                 },
-                {
-                    name: catEmojiKitchen,
-                    displayName: i18n("Emoji Kitchen"),
-                    icon: "path-union-symbolic"
-                },
+
                 {
                     name: "Smileys & Emotion",
                     displayName: i18n("Smileys & Emotion"),
@@ -1332,27 +1320,17 @@ PlasmoidItem {
                 if (savedOrder && savedOrder.length > 0) {
                     try {
                         var parsed = JSON.parse(savedOrder);
+                        parsed = parsed.filter(item => item.name !== catFavorites && item.name !== catRecent);
 
-                        var hasKitchen = false;
                         var hasGifs = false;
                         for (var k = 0; k < parsed.length; k++) {
-                            if (parsed[k].name === catEmojiKitchen) {
-                                hasKitchen = true;
-                                parsed[k].icon = "path-union-symbolic";
-                            }
                             if (parsed[k].name === catGifs) {
                                 hasGifs = true;
                                 parsed[k].icon = "fileview-preview-symbolic";
                             }
                         }
-                        if (!hasKitchen) {
-                            parsed.unshift({
-                                name: catEmojiKitchen,
-                                icon: "path-union-symbolic"
-                            });
-                        }
                         if (!hasGifs) {
-                            parsed.splice(hasKitchen ? 1 : 0, 0, {
+                            parsed.splice(0, 0, {
                                 name: catGifs,
                                 icon: "fileview-preview-symbolic"
                             });
@@ -2227,7 +2205,7 @@ PlasmoidItem {
                                                 mouse.accepted = true;
                                             } else if (fullRoot.draggedCategoryIndex !== index) {
                                                 fullRoot.selectedCategory = model.name;
-                                                if (model.name !== fullRoot.catFavorites && model.name !== fullRoot.catRecent && model.name !== fullRoot.catGifs && model.name !== fullRoot.catEmojiKitchen) {
+                                                if (model.name !== fullRoot.catGifs && model.name !== fullRoot.catEmojiKitchen) {
                                                     if (typeof allEmojisView !== "undefined") {
                                                         allEmojisView.scrollToCategory(model.name);
                                                     }
@@ -2251,699 +2229,6 @@ PlasmoidItem {
                         Layout.fillHeight: true
                         Kirigami.Theme.colorSet: Kirigami.Theme.Window
                         Kirigami.Theme.inherit: false
-
-                        Item {
-                            id: kitchenView
-                            anchors.fill: parent
-                            visible: fullRoot.selectedCategory === fullRoot.catEmojiKitchen
-
-                            property string emoji1: ""
-                            property string emoji2: ""
-                            property string resultUrl: ""
-                            property string resultUrlAlternative: ""
-                            property string _actualSource: ""
-                            property string currentValidUrl: ""
-                            property var candidatesList: []
-                            property int currentCandidateIndex: 0
-
-                            onResultUrlChanged: _actualSource = resultUrl
-
-                            Plasma5Support.DataSource {
-                                id: shellSource
-                                engine: "executable"
-                                connectedSources: []
-                                onNewData: (source, data) => {
-                                    disconnectSource(source);
-                                }
-                            }
-
-                            readonly property int slotSize: {
-                                let calculated = Math.floor((kitchenView.width - 144) / 3);
-                                return Math.min(160, Math.max(32, calculated));
-                            }
-
-
-
-                            function updateResult() {
-                                if (emoji1 !== "" && emoji2 !== "") {
-                                    let cp1 = fullRoot.getCodepoint(emoji1);
-                                    let cp2 = fullRoot.getCodepoint(emoji2);
-
-                                    let findCombo = (c1, c2) => {
-                                        let stripFE0F = s => s.replace(/-fe0f/g, "");
-                                        let c1_norm = stripFE0F(c1);
-                                        let c2_norm = stripFE0F(c2);
-
-                                        let base = KitchenMetadata.kitchenMetadata[c1];
-                                        if (base) {
-                                            let exact = base.find(c => stripFE0F(c.e) === c2_norm);
-                                            if (exact)
-                                            return {
-                                                entry: exact,
-                                                b: c1,
-                                                p: exact.e
-                                            };
-                                        }
-
-                                        base = KitchenMetadata.kitchenMetadata[c1_norm];
-                                        if (base) {
-                                            let loose = base.find(c => stripFE0F(c.e) === c2_norm);
-                                            if (loose)
-                                            return {
-                                                entry: loose,
-                                                b: c1_norm,
-                                                p: loose.e
-                                            };
-                                        }
-                                        return null;
-                                    };
-
-                                    let combo = findCombo(cp1, cp2) || findCombo(cp2, cp1);
-
-                                    if (combo) {
-                                        let toUrl = cp => "u" + cp.replace(/-/g, "-u");
-                                        let stripFE0F = s => s.replace(/-fe0f/g, "");
-
-                                        let b_unstripped = combo.b;
-                                        let b_stripped = stripFE0F(combo.b);
-                                        let p_unstripped = combo.p;
-                                        let p_stripped = stripFE0F(combo.p);
-
-                                        let baseUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + combo.entry.d + "/";
-
-                                        let candidates = [];
-
-                                        candidates.push(baseUrl + toUrl(b_unstripped) + "/" + toUrl(combo.b) + "_" + toUrl(combo.p) + ".png");
-                                        if (b_stripped !== b_unstripped) {
-                                            candidates.push(baseUrl + toUrl(b_stripped) + "/" + toUrl(combo.b) + "_" + toUrl(combo.p) + ".png");
-                                        }
-
-                                        candidates.push(baseUrl + toUrl(p_unstripped) + "/" + toUrl(combo.p) + "_" + toUrl(combo.b) + ".png");
-                                        if (p_stripped !== p_unstripped) {
-                                            candidates.push(baseUrl + toUrl(p_stripped) + "/" + toUrl(combo.p) + "_" + toUrl(combo.b) + ".png");
-                                        }
-
-                                        candidatesList = candidates;
-                                        currentCandidateIndex = 0;
-                                        resultUrl = candidates[0];
-                                        _actualSource = candidates[0];
-
-                                        console.log("DEBUG: Candidates list generated:", JSON.stringify(candidates));
-                                    } else {
-                                        candidatesList = [];
-                                        currentCandidateIndex = 0;
-                                        resultUrl = "";
-                                        _actualSource = "";
-                                        currentValidUrl = "";
-                                    }
-                                } else {
-                                    candidatesList = [];
-                                    currentCandidateIndex = 0;
-                                    resultUrl = "";
-                                    _actualSource = "";
-                                    currentValidUrl = "";
-                                }
-                            }
-                            onEmoji1Changed: updateResult()
-                            onEmoji2Changed: updateResult()
-
-                            function emojiFromCodepoint(cp) {
-                                if (!cp)
-                                return "";
-                                return cp.split("-").map(part => String.fromCodePoint(parseInt(part, 16))).join("");
-                            }
-                            function randomize() {
-                                let bases = Object.keys(KitchenMetadata.kitchenMetadata);
-                                if (bases.length > 0) {
-                                    let cp1 = bases[Math.floor(Math.random() * bases.length)];
-                                    let partners = KitchenMetadata.kitchenMetadata[cp1];
-                                    if (partners && partners.length > 0) {
-                                        let partnerEntry = partners[Math.floor(Math.random() * partners.length)];
-                                        let cp2 = partnerEntry.e;
-
-                                        emoji1 = emojiFromCodepoint(cp1);
-                                        emoji2 = emojiFromCodepoint(cp2);
-                                    }
-                                }
-                            }
-
-                            function randomizeSlot1() {
-                                let bases = Object.keys(KitchenMetadata.kitchenMetadata);
-                                if (bases.length === 0)
-                                return;
-                                if (emoji2 !== "") {
-                                    let cp2 = fullRoot.getCodepoint(emoji2).replace(/-fe0f/g, "");
-                                    let validBases = [];
-                                    for (let cp1 of bases) {
-                                        let partners = KitchenMetadata.kitchenMetadata[cp1];
-                                        if (partners) {
-                                            for (let p of partners) {
-                                                if (p.e.replace(/-fe0f/g, "") === cp2) {
-                                                    validBases.push(cp1);
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    if (validBases.length > 0) {
-                                        let chosenCp = validBases[Math.floor(Math.random() * validBases.length)];
-                                        emoji1 = emojiFromCodepoint(chosenCp);
-                                        return;
-                                    }
-                                }
-                                let chosenCp = bases[Math.floor(Math.random() * bases.length)];
-                                emoji1 = emojiFromCodepoint(chosenCp);
-                            }
-
-                            function randomizeSlot2() {
-                                let bases = Object.keys(KitchenMetadata.kitchenMetadata);
-                                if (bases.length === 0)
-                                return;
-                                if (emoji1 !== "") {
-                                    let cp1_raw = fullRoot.getCodepoint(emoji1);
-                                    let cp1 = bases.find(k => k.replace(/-fe0f/g, "") === cp1_raw.replace(/-fe0f/g, ""));
-                                    if (cp1) {
-                                        let partners = KitchenMetadata.kitchenMetadata[cp1];
-                                        if (partners && partners.length > 0) {
-                                            let chosenPartner = partners[Math.floor(Math.random() * partners.length)];
-                                            emoji2 = emojiFromCodepoint(chosenPartner.e);
-                                            return;
-                                        }
-                                    }
-                                }
-                                let chosenCp = bases[Math.floor(Math.random() * bases.length)];
-                                emoji2 = emojiFromCodepoint(chosenCp);
-                            }
-
-                            function copyResult() {
-                                if (currentValidUrl !== "") {
-                                    let cmd = 'curl -sL "' + currentValidUrl + '" > /tmp/kmoji_copy.png && (wl-copy --type image/png < /tmp/kmoji_copy.png || xclip -selection clipboard -t image/png -i /tmp/kmoji_copy.png)';
-                                    shellSource.connectSource(cmd);
-                                    showPasteTemporaryMessage(i18n("Copied mashup to clipboard!"));
-
-                                    fullRoot.addRecentItem("kitchen", {
-                                        url: currentValidUrl,
-                                        emoji1: emoji1,
-                                        emoji2: emoji2
-                                    });
-                                }
-                            }
-
-                            RowLayout {
-                                id: selectionRow
-                                anchors.top: parent.top
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.topMargin: 16
-                                anchors.leftMargin: 16
-                                anchors.rightMargin: 16
-                                spacing: 16
-                                clip: true
-
-                                Item {
-                                    Layout.fillWidth: true
-                                }
-
-                                ColumnLayout {
-                                    spacing: 8
-                                    Layout.alignment: Qt.AlignVCenter
-
-                                    Rectangle {
-                                        id: slot1
-                                        width: kitchenView.slotSize
-                                        height: kitchenView.slotSize
-                                        Layout.preferredWidth: kitchenView.slotSize
-                                        Layout.preferredHeight: kitchenView.slotSize
-                                        color: Kirigami.Theme.backgroundColor
-                                        border.color: (activeFocus || slot1MouseArea.containsMouse || kitchenView.emoji1 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                                        border.width: (activeFocus || slot1MouseArea.containsMouse || kitchenView.emoji1 === "") ? 2 : 1
-                                        radius: 8
-
-                                        focusPolicy: Qt.StrongFocus
-                                        activeFocusOnTab: true
-                                        KeyNavigation.tab: randomizeSlot1Button
-                                        KeyNavigation.backtab: (categoryListView.currentItem || sidebarToggleButton)
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: kitchenView.emoji1 === "" ? "?" : kitchenView.emoji1
-                                            font.pixelSize: kitchenView.emoji1 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
-                                            font.family: kitchenView.emoji1 === "" ? "" : "Noto Color Emoji"
-                                            color: Kirigami.Theme.textColor
-                                            opacity: kitchenView.emoji1 === "" ? 0.2 : 1.0
-                                            renderType: kitchenView.emoji1 === "" ? Text.QtRendering : Text.NativeRendering
-                                        }
-
-                                        MouseArea {
-                                            id: slot1MouseArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                slot1.forceActiveFocus();
-                                                kitchenView.emoji1 = "";
-                                            }
-                                        }
-
-                                        Keys.onReturnPressed: kitchenView.emoji1 = ""
-                                        Keys.onEnterPressed: kitchenView.emoji1 = ""
-                                    }
-
-                                    PlasmaComponents.ToolButton {
-                                        id: randomizeSlot1Button
-                                        display: PlasmaComponents.ToolButton.IconOnly
-                                        icon.name: "roll-symbolic"
-                                        Layout.alignment: Qt.AlignHCenter
-                                        activeFocusOnTab: true
-                                        KeyNavigation.tab: slot2
-                                        KeyNavigation.backtab: slot1
-                                        onClicked: kitchenView.randomizeSlot1()
-                                        PlasmaComponents.ToolTip {
-                                            text: i18n("Randomize Slot 1")
-                                        }
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    spacing: 8
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Text {
-                                        text: "+"
-                                        font.pixelSize: 24
-                                        color: Kirigami.Theme.textColor
-                                        opacity: 0.6
-                                        Layout.alignment: Qt.AlignHCenter
-                                    }
-                                    Item {
-                                        Layout.preferredHeight: 32
-                                        Layout.preferredWidth: 1
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    spacing: 8
-                                    Layout.alignment: Qt.AlignVCenter
-
-                                    Rectangle {
-                                        id: slot2
-                                        width: kitchenView.slotSize
-                                        height: kitchenView.slotSize
-                                        Layout.preferredWidth: kitchenView.slotSize
-                                        Layout.preferredHeight: kitchenView.slotSize
-                                        color: Kirigami.Theme.backgroundColor
-                                        border.color: (activeFocus || slot2MouseArea.containsMouse || kitchenView.emoji2 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                                        border.width: (activeFocus || slot2MouseArea.containsMouse || kitchenView.emoji2 === "") ? 2 : 1
-                                        radius: 8
-
-                                        focusPolicy: Qt.StrongFocus
-                                        activeFocusOnTab: true
-                                        KeyNavigation.tab: randomizeSlot2Button
-                                        KeyNavigation.backtab: randomizeSlot1Button
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: kitchenView.emoji2 === "" ? "?" : kitchenView.emoji2
-                                            font.pixelSize: kitchenView.emoji2 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
-                                            font.family: kitchenView.emoji2 === "" ? "" : "Noto Color Emoji"
-                                            color: Kirigami.Theme.textColor
-                                            opacity: kitchenView.emoji2 === "" ? 0.2 : 1.0
-                                            renderType: kitchenView.emoji2 === "" ? Text.QtRendering : Text.NativeRendering
-                                        }
-
-                                        MouseArea {
-                                            id: slot2MouseArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                slot2.forceActiveFocus();
-                                                kitchenView.emoji2 = "";
-                                            }
-                                        }
-
-                                        Keys.onReturnPressed: kitchenView.emoji2 = ""
-                                        Keys.onEnterPressed: kitchenView.emoji2 = ""
-                                    }
-
-                                    PlasmaComponents.ToolButton {
-                                        id: randomizeSlot2Button
-                                        display: PlasmaComponents.ToolButton.IconOnly
-                                        icon.name: "roll-symbolic"
-                                        Layout.alignment: Qt.AlignHCenter
-                                        activeFocusOnTab: true
-                                        KeyNavigation.tab: resultSlot
-                                        KeyNavigation.backtab: slot2
-                                        onClicked: kitchenView.randomizeSlot2()
-                                        PlasmaComponents.ToolTip {
-                                            text: i18n("Randomize Slot 2")
-                                        }
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    spacing: 8
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Text {
-                                        text: "="
-                                        font.pixelSize: 24
-                                        color: Kirigami.Theme.textColor
-                                        opacity: 0.6
-                                        Layout.alignment: Qt.AlignHCenter
-                                    }
-                                    Item {
-                                        Layout.preferredHeight: 32
-                                        Layout.preferredWidth: 1
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    spacing: 8
-                                    Layout.alignment: Qt.AlignVCenter
-
-                                    Rectangle {
-                                        id: resultSlot
-                                        width: kitchenView.slotSize
-                                        height: kitchenView.slotSize
-                                        Layout.preferredWidth: kitchenView.slotSize
-                                        Layout.preferredHeight: kitchenView.slotSize
-                                        color: Kirigami.Theme.backgroundColor
-                                        border.color: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                                        border.width: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl === "") ? 2 : 1
-                                        radius: 8
-
-                                        focusPolicy: Qt.StrongFocus
-                                        activeFocusOnTab: true
-                                        KeyNavigation.tab: randomizeResultButton
-                                        KeyNavigation.backtab: randomizeSlot2Button
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "?"
-                                            font.pixelSize: Math.floor(kitchenView.slotSize * 0.6)
-                                            color: Kirigami.Theme.textColor
-                                            opacity: 0.2 * (1.0 - resultImage.opacity)
-                                        }
-
-                                        Image {
-                                            id: resultImage
-                                            anchors.fill: parent
-                                            anchors.margins: 8
-                                            source: kitchenView._actualSource
-                                            sourceSize: Qt.size(512, 512)
-                                            fillMode: Image.PreserveAspectFit
-                                            opacity: (status === Image.Ready && kitchenView.resultUrl !== "") ? 1.0 : 0.0
-                                            smooth: true
-                                            mipmap: true
-                                            asynchronous: true
-
-                                            Behavior on opacity {
-                                                NumberAnimation {
-                                                    duration: 150
-                                                }
-                                            }
-
-                                            onStatusChanged: {
-                                                if (status === Image.Ready) {
-                                                    kitchenView.currentValidUrl = source.toString();
-                                                } else if (status === Image.Error) {
-                                                    if (kitchenView.currentCandidateIndex + 1 < kitchenView.candidatesList.length) {
-                                                        kitchenView.currentCandidateIndex += 1;
-                                                        kitchenView._actualSource = kitchenView.candidatesList[kitchenView.currentCandidateIndex];
-                                                    } else {
-                                                        kitchenView.currentValidUrl = "";
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        HoverHandler {
-                                            id: resultSlotHover
-                                            cursorShape: kitchenView.currentValidUrl !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                        }
-
-                                        MouseArea {
-                                            id: resultSlotArea
-                                            anchors.fill: parent
-                                            enabled: kitchenView.currentValidUrl !== ""
-                                            acceptedButtons: Qt.LeftButton
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                resultSlot.forceActiveFocus();
-                                                kitchenView.copyResult();
-                                            }
-                                        }
-
-                                        PlasmaComponents.ToolButton {
-                                            anchors.top: parent.top
-                                            anchors.right: parent.right
-                                            anchors.margins: 4
-                                            icon.name: fullRoot.isFavoriteItem("kitchen", {
-                                                url: kitchenView.currentValidUrl
-                                            }) ? "bookmarks-bookmarked" : "bookmarks"
-                                            visible: resultSlotHover.hovered && kitchenView.currentValidUrl !== ""
-                                            width: 24
-                                            height: 24
-                                            display: PlasmaComponents.ToolButton.IconOnly
-                                            z: 10
-                                            background: Rectangle {
-                                                color: parent.pressed ? Kirigami.Theme.highlightColor : (parent.hovered ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.35) : Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.85))
-                                                radius: 4
-                                                border.color: (parent.pressed || parent.hovered) ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
-                                                border.width: 1
-                                            }
-
-                                            onClicked: {
-                                                fullRoot.toggleFavoriteItem("kitchen", {
-                                                    url: kitchenView.currentValidUrl,
-                                                    emoji1: kitchenView.emoji1,
-                                                    emoji2: kitchenView.emoji2
-                                                });
-                                            }
-                                        }
-
-                                        Keys.onReturnPressed: if (kitchenView.currentValidUrl !== "")
-                                        kitchenView.copyResult()
-                                        Keys.onEnterPressed: if (kitchenView.currentValidUrl !== "")
-                                        kitchenView.copyResult()
-                                    }
-
-                                    PlasmaComponents.ToolButton {
-                                        id: randomizeResultButton
-                                        display: PlasmaComponents.ToolButton.IconOnly
-                                        icon.name: "roll-symbolic"
-                                        Layout.alignment: Qt.AlignHCenter
-                                        activeFocusOnTab: true
-                                        KeyNavigation.tab: kitchenGridView
-                                        KeyNavigation.backtab: resultSlot
-                                        onClicked: kitchenView.randomize()
-                                        PlasmaComponents.ToolTip {
-                                            text: i18n("Randomize Result")
-                                        }
-                                    }
-                                }
-
-                                Item {
-                                    Layout.fillWidth: true
-                                }
-                            }
-
-                            Kirigami.Separator {
-                                id: gridSeparator
-                                anchors.top: selectionRow.bottom
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.topMargin: 8
-                            }
-
-                            GridView {
-                                id: kitchenGridView
-                                anchors.top: gridSeparator.bottom
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.bottom: parent.bottom
-                                cellWidth: fullRoot.internalGridSize
-                                cellHeight: fullRoot.internalGridSize
-                                rightMargin: ScrollBar.vertical.visible ? ScrollBar.vertical.width : 0
-                                clip: true
-                                interactive: false
-                                flickableDirection: Flickable.VerticalFlick
-                                model: fullRoot.filteredEmojis
-
-                                activeFocusOnTab: true
-                                KeyNavigation.tab: searchField
-                                KeyNavigation.backtab: randomizeResultButton
-
-                                keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
-                                keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
-
-                                WheelHandler {
-                                    id: kitchenGridWheelHandler
-                                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                                    onWheel: function (event) {
-                                        const step = fullRoot.internalGridSize * 3;
-                                        const delta = event.angleDelta.y;
-                                        const newY = kitchenGridView.contentY - (delta / 120) * step;
-                                        kitchenGridView.contentY = Math.max(0, Math.min(kitchenGridView.contentHeight - kitchenGridView.height, newY));
-                                        event.accepted = true;
-                                    }
-                                }
-
-                                HoverHandler {
-                                    id: kitchenGridHoverHandler
-                                    onHoveredChanged: {
-                                        fullRoot.gridIsMouseOver = hovered;
-                                        if (!hovered && fullRoot.emojiHoveredEmojiKey !== "") {
-                                            fullRoot.emojiLastHoveredEmojiKey = fullRoot.emojiHoveredEmojiKey;
-                                            fullRoot.emojiHoveredEmojiKey = "";
-                                            fullRoot.hoveredEmojiName = "";
-                                        }
-                                    }
-                                }
-
-                                property bool keyboardActionPressed: false
-
-                                Timer {
-                                    id: keyboardReleaseTimer
-                                    interval: 150
-                                    onTriggered: kitchenGridView.keyboardActionPressed = false
-                                }
-
-                                Keys.onPressed: function (event) {
-                                    if (!fullRoot.emojiKeyboardNavigationEnabled)
-                                    return;
-                                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                        if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                            kitchenView.emoji1 = fullRoot.filteredEmojis[currentIndex].emoji;
-                                        }
-                                        keyboardActionPressed = true;
-                                        keyboardReleaseTimer.restart();
-                                        event.accepted = true;
-                                    } else if (event.key === Qt.Key_Space) {
-                                        if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                            kitchenView.emoji2 = fullRoot.filteredEmojis[currentIndex].emoji;
-                                        }
-                                        keyboardActionPressed = true;
-                                        keyboardReleaseTimer.restart();
-                                        event.accepted = true;
-                                    } else if (event.key === Qt.Key_Escape) {
-                                        handleEscapePressed();
-                                        event.accepted = true;
-                                    } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                                        const backwards = (event.key === Qt.Key_Backtab) || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier));
-                                        if (!backwards) {
-                                            searchField.forceActiveFocus();
-                                            event.accepted = true;
-                                        } else {
-                                            randomizeResultButton.forceActiveFocus();
-                                            event.accepted = true;
-                                        }
-                                    }
-                                }
-
-                                ScrollBar.vertical: ScrollBar {
-                                    active: kitchenGridView.moving || kitchenGridView.contentHeight > kitchenGridView.height
-                                }
-
-                                function updateKeyboardHover() {
-                                    if (!fullRoot.emojiKeyboardNavigationEnabled)
-                                    return;
-                                    if (currentIndex >= 0 && currentIndex < fullRoot.filteredEmojis.length) {
-                                        const item = fullRoot.filteredEmojis[currentIndex];
-                                        if (item) {
-                                            if (fullRoot.emojiHoveredEmojiKey !== item.emoji) {
-                                                fullRoot.emojiHoveredEmojiKey = item.emoji;
-                                                fullRoot.hoveredEmojiName = item.name;
-                                            }
-                                            if (fullRoot.emojiLastHoveredEmojiKey !== item.emoji) {
-                                                fullRoot.emojiLastHoveredEmojiKey = item.emoji;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                function clearKeyboardHover() {
-                                    if (fullRoot.emojiHoveredEmojiKey !== "") {
-                                        fullRoot.emojiHoveredEmojiKey = "";
-                                        fullRoot.hoveredEmojiName = "";
-                                    }
-                                }
-
-                                onActiveFocusChanged: {
-                                    if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
-                                        if (count > 0) {
-                                            if (currentIndex < 0 || currentIndex >= count) {
-                                                currentIndex = 0;
-                                            } else {
-                                                updateKeyboardHover();
-                                            }
-                                        }
-                                    } else if (!activeFocus) {
-                                        clearKeyboardHover();
-                                    }
-                                }
-
-                                onCurrentIndexChanged: {
-                                    if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
-                                        updateKeyboardHover();
-                                    }
-                                }
-
-                                delegate: Item {
-                                    width: fullRoot.internalGridSize
-                                    height: fullRoot.internalGridSize
-
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        anchors.margins: 2
-                                        color: Kirigami.Theme.highlightColor
-                                        radius: 4
-                                        opacity: (mouseArea.pressed || (kitchenGridView.activeFocus && kitchenGridView.currentIndex === index && kitchenGridView.keyboardActionPressed)) ? 1.0 : (mouseArea.containsMouse || (kitchenGridView.activeFocus && (kitchenGridView.currentIndex === index || (fullRoot.emojiLastHoveredEmojiKey === modelData.emoji && !true)))) ? 0.2 : 0
-                                    }
-
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        color: "transparent"
-                                        radius: 4
-                                        border.width: (mouseArea.pressed || (kitchenGridView.activeFocus && kitchenGridView.currentIndex === index && kitchenGridView.keyboardActionPressed) || mouseArea.containsMouse || (kitchenGridView.activeFocus && (kitchenGridView.currentIndex === index || (fullRoot.emojiLastHoveredEmojiKey === modelData.emoji && !true)))) ? 2 : 0
-                                        border.color: Kirigami.Theme.highlightColor
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: modelData.emoji
-                                        font.pixelSize: Math.floor(fullRoot.internalGridSize * 0.81)
-                                        font.family: "Noto Color Emoji"
-                                        renderType: Text.NativeRendering
-                                    }
-
-                                    MouseArea {
-                                        id: mouseArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                        onEntered: {
-                                            fullRoot.emojiHoveredEmojiKey = modelData.emoji;
-                                            fullRoot.hoveredEmojiName = modelData.name;
-                                            if (fullRoot.emojiKeyboardNavigationEnabled) {
-                                                kitchenGridView.currentIndex = index;
-                                            }
-                                        }
-                                        onExited: {
-                                            if (fullRoot.emojiHoveredEmojiKey === modelData.emoji) {
-                                                fullRoot.emojiLastHoveredEmojiKey = modelData.emoji;
-                                            }
-                                        }
-                                        onClicked: function (mouse) {
-                                            if (mouse.button === Qt.LeftButton) {
-                                                kitchenView.emoji1 = modelData.emoji;
-                                            } else if (mouse.button === Qt.RightButton) {
-                                                kitchenView.emoji2 = modelData.emoji;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
 
                         Item {
                             id: gifView
@@ -3498,7 +2783,7 @@ PlasmoidItem {
                         ScrollView {
                             id: allEmojisView
                             anchors.fill: parent
-                            visible: fullRoot.selectedCategory !== fullRoot.catEmojiKitchen && fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.selectedCategory !== fullRoot.catFavorites && fullRoot.selectedCategory !== fullRoot.catRecent
+                            visible: fullRoot.selectedCategory !== fullRoot.catGifs
                             clip: true
 
                             property var categoryStates: ({})
@@ -3517,9 +2802,7 @@ PlasmoidItem {
                                         }
                                     }
                                     if (activeCat !== "" && fullRoot.selectedCategory !== activeCat) {
-                                        if (activeCat !== "Favorites" && activeCat !== "Recent") {
-                                            fullRoot.selectedCategory = activeCat;
-                                        }
+                                        fullRoot.selectedCategory = activeCat;
                                     }
                                 }
                             }
@@ -3544,6 +2827,15 @@ PlasmoidItem {
                             }
 
                             function scrollToCategory(catName) {
+                                if (catName === fullRoot.catEmojiKitchen) {
+                                    let states = Object.assign({}, categoryStates);
+                                    states[catName] = true;
+                                    categoryStates = states;
+                                    scrollTimer.targetItem = emojiKitchenSection;
+                                    scrollTimer.restart();
+                                    return;
+                                }
+
                                 for (let i = 0; i < allEmojisRepeater.count; i++) {
                                     let item = allEmojisRepeater.itemAt(i);
                                     if (item && item.catName === catName) {
@@ -3562,27 +2854,820 @@ PlasmoidItem {
                             Column {
                                 id: allEmojisLayout
                                 width: allEmojisView.width - (allEmojisView.ScrollBar.vertical.visible ? allEmojisView.ScrollBar.vertical.width : 0)
-                                spacing: 16
+                                spacing: 0
 
-                                Repeater {
-                                    id: allEmojisRepeater
-                                    model: ["Favorites", "Recent", "Smileys & Emotion", "People & Body", "Animals & Nature", "Food & Drink", "Activities", "Travel & Places", "Objects", "Symbols", "Flags"]
-                                    delegate: Column {
+                                
+                                Column {
+                                    id: emojiKitchenSection
+                                    width: parent.width
+                                    spacing: 8
+                                    property string catName: fullRoot.catEmojiKitchen
+
+                                    Item {
+                                        id: kitchenCatHeader
                                         width: parent.width
-                                        spacing: 8
-                                        property string catName: modelData
-                                        property var catEmojis: {
-                                            let sourceList = [];
-                                            if (catName === "Favorites") sourceList = fullRoot.favoriteEmojis || [];
-                                            else if (catName === "Recent") sourceList = (fullRoot.recentEmojis || []).slice(0, 36);
-                                            else sourceList = fullRoot.filteredEmojiByGroup[modelData] || [];
-                                            
-                                            if ((catName === "Favorites" || catName === "Recent") && fullRoot.filter && fullRoot.filter.trim() !== "") {
-                                                return performFilter(sourceList, fullRoot.filter);
+                                        height: 32
+                                        property bool isExpanded: allEmojisView.categoryStates[emojiKitchenSection.catName] !== false
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            color: Kirigami.Theme.highlightColor
+                                            opacity: kitchenCatHeaderMouse.containsMouse ? 0.1 : 0
+                                            radius: 4
+                                            Behavior on opacity {
+                                                NumberAnimation {
+                                                    duration: 150
+                                                }
                                             }
-                                            return sourceList;
                                         }
-                                        visible: catEmojis.length > 0
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 8
+                                            anchors.rightMargin: 8
+                                            spacing: 8
+
+                                            Item {
+                                                implicitWidth: 16
+                                                implicitHeight: 16
+                                                Kirigami.Icon {
+                                                    anchors.centerIn: parent
+                                                    source: kitchenCatHeader.isExpanded ? "go-down" : "go-next"
+                                                    width: 16
+                                                    height: 16
+                                                }
+                                            }
+
+                                            PlasmaComponents.Label {
+                                                text: i18n("Emoji Kitchen")
+                                                font.bold: true
+                                                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                            }
+
+                                            Kirigami.Separator {
+                                                Layout.fillWidth: true
+                                                opacity: 0.3
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: kitchenCatHeaderMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                let currentlyExpanded = allEmojisView.categoryStates[emojiKitchenSection.catName] !== false;
+                                                allEmojisView.toggleCategory(emojiKitchenSection.catName);
+                                                if (!currentlyExpanded) {
+                                                    allEmojisView.scrollToCategory(emojiKitchenSection.catName);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Column {
+                                        id: kitchenContentWrapper
+                                        width: parent.width
+                                        visible: kitchenCatHeader.isExpanded
+                                        spacing: 0
+                                        
+                        Item {
+                            id: kitchenView
+                            width: parent.width
+                            implicitHeight: kitchenGridView.y + kitchenGridView.height
+                            property string emoji1: ""
+                            property string emoji2: ""
+                            property string resultUrl: ""
+                            property string resultUrlAlternative: ""
+                            property string _actualSource: ""
+                            property string currentValidUrl: ""
+                            property var candidatesList: []
+                            property int currentCandidateIndex: 0
+
+                            onResultUrlChanged: _actualSource = resultUrl
+
+                            Plasma5Support.DataSource {
+                                id: shellSource
+                                engine: "executable"
+                                connectedSources: []
+                                onNewData: (source, data) => {
+                                    disconnectSource(source);
+                                }
+                            }
+
+                            readonly property int slotSize: {
+                                let calculated = Math.floor((kitchenView.width - 144) / 3);
+                                return Math.min(160, Math.max(32, calculated));
+                            }
+
+
+
+                            function updateResult() {
+                                if (emoji1 !== "" && emoji2 !== "") {
+                                    let cp1 = fullRoot.getCodepoint(emoji1);
+                                    let cp2 = fullRoot.getCodepoint(emoji2);
+
+                                    let findCombo = (c1, c2) => {
+                                        let stripFE0F = s => s.replace(/-fe0f/g, "");
+                                        let c1_norm = stripFE0F(c1);
+                                        let c2_norm = stripFE0F(c2);
+
+                                        let base = KitchenMetadata.kitchenMetadata[c1];
+                                        if (base) {
+                                            let exact = base.find(c => stripFE0F(c.e) === c2_norm);
+                                            if (exact)
+                                            return {
+                                                entry: exact,
+                                                b: c1,
+                                                p: exact.e
+                                            };
+                                        }
+
+                                        base = KitchenMetadata.kitchenMetadata[c1_norm];
+                                        if (base) {
+                                            let loose = base.find(c => stripFE0F(c.e) === c2_norm);
+                                            if (loose)
+                                            return {
+                                                entry: loose,
+                                                b: c1_norm,
+                                                p: loose.e
+                                            };
+                                        }
+                                        return null;
+                                    };
+
+                                    let combo = findCombo(cp1, cp2) || findCombo(cp2, cp1);
+
+                                    if (combo) {
+                                        let toUrl = cp => "u" + cp.replace(/-/g, "-u");
+                                        let stripFE0F = s => s.replace(/-fe0f/g, "");
+
+                                        let b_unstripped = combo.b;
+                                        let b_stripped = stripFE0F(combo.b);
+                                        let p_unstripped = combo.p;
+                                        let p_stripped = stripFE0F(combo.p);
+
+                                        let baseUrl = "https://www.gstatic.com/android/keyboard/emojikitchen/" + combo.entry.d + "/";
+
+                                        let candidates = [];
+
+                                        candidates.push(baseUrl + toUrl(b_unstripped) + "/" + toUrl(combo.b) + "_" + toUrl(combo.p) + ".png");
+                                        if (b_stripped !== b_unstripped) {
+                                            candidates.push(baseUrl + toUrl(b_stripped) + "/" + toUrl(combo.b) + "_" + toUrl(combo.p) + ".png");
+                                        }
+
+                                        candidates.push(baseUrl + toUrl(p_unstripped) + "/" + toUrl(combo.p) + "_" + toUrl(combo.b) + ".png");
+                                        if (p_stripped !== p_unstripped) {
+                                            candidates.push(baseUrl + toUrl(p_stripped) + "/" + toUrl(combo.p) + "_" + toUrl(combo.b) + ".png");
+                                        }
+
+                                        candidatesList = candidates;
+                                        currentCandidateIndex = 0;
+                                        resultUrl = candidates[0];
+                                        _actualSource = candidates[0];
+
+                                        console.log("DEBUG: Candidates list generated:", JSON.stringify(candidates));
+                                    } else {
+                                        candidatesList = [];
+                                        currentCandidateIndex = 0;
+                                        resultUrl = "";
+                                        _actualSource = "";
+                                        currentValidUrl = "";
+                                    }
+                                } else {
+                                    candidatesList = [];
+                                    currentCandidateIndex = 0;
+                                    resultUrl = "";
+                                    _actualSource = "";
+                                    currentValidUrl = "";
+                                }
+                            }
+                            onEmoji1Changed: updateResult()
+                            onEmoji2Changed: updateResult()
+
+                            function emojiFromCodepoint(cp) {
+                                if (!cp)
+                                return "";
+                                return cp.split("-").map(part => String.fromCodePoint(parseInt(part, 16))).join("");
+                            }
+                            function randomize() {
+                                let bases = Object.keys(KitchenMetadata.kitchenMetadata);
+                                if (bases.length > 0) {
+                                    let cp1 = bases[Math.floor(Math.random() * bases.length)];
+                                    let partners = KitchenMetadata.kitchenMetadata[cp1];
+                                    if (partners && partners.length > 0) {
+                                        let partnerEntry = partners[Math.floor(Math.random() * partners.length)];
+                                        let cp2 = partnerEntry.e;
+
+                                        emoji1 = emojiFromCodepoint(cp1);
+                                        emoji2 = emojiFromCodepoint(cp2);
+                                    }
+                                }
+                            }
+
+                            function randomizeSlot1() {
+                                let bases = Object.keys(KitchenMetadata.kitchenMetadata);
+                                if (bases.length === 0)
+                                return;
+                                if (emoji2 !== "") {
+                                    let cp2 = fullRoot.getCodepoint(emoji2).replace(/-fe0f/g, "");
+                                    let validBases = [];
+                                    for (let cp1 of bases) {
+                                        let partners = KitchenMetadata.kitchenMetadata[cp1];
+                                        if (partners) {
+                                            for (let p of partners) {
+                                                if (p.e.replace(/-fe0f/g, "") === cp2) {
+                                                    validBases.push(cp1);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (validBases.length > 0) {
+                                        let chosenCp = validBases[Math.floor(Math.random() * validBases.length)];
+                                        emoji1 = emojiFromCodepoint(chosenCp);
+                                        return;
+                                    }
+                                }
+                                let chosenCp = bases[Math.floor(Math.random() * bases.length)];
+                                emoji1 = emojiFromCodepoint(chosenCp);
+                            }
+
+                            function randomizeSlot2() {
+                                let bases = Object.keys(KitchenMetadata.kitchenMetadata);
+                                if (bases.length === 0)
+                                return;
+                                if (emoji1 !== "") {
+                                    let cp1_raw = fullRoot.getCodepoint(emoji1);
+                                    let cp1 = bases.find(k => k.replace(/-fe0f/g, "") === cp1_raw.replace(/-fe0f/g, ""));
+                                    if (cp1) {
+                                        let partners = KitchenMetadata.kitchenMetadata[cp1];
+                                        if (partners && partners.length > 0) {
+                                            let chosenPartner = partners[Math.floor(Math.random() * partners.length)];
+                                            emoji2 = emojiFromCodepoint(chosenPartner.e);
+                                            return;
+                                        }
+                                    }
+                                }
+                                let chosenCp = bases[Math.floor(Math.random() * bases.length)];
+                                emoji2 = emojiFromCodepoint(chosenCp);
+                            }
+
+                            function copyResult() {
+                                if (currentValidUrl !== "") {
+                                    let cmd = 'curl -sL "' + currentValidUrl + '" > /tmp/kmoji_copy.png && (wl-copy --type image/png < /tmp/kmoji_copy.png || xclip -selection clipboard -t image/png -i /tmp/kmoji_copy.png)';
+                                    shellSource.connectSource(cmd);
+                                    showPasteTemporaryMessage(i18n("Copied mashup to clipboard!"));
+
+                                    fullRoot.addRecentItem("kitchen", {
+                                        url: currentValidUrl,
+                                        emoji1: emoji1,
+                                        emoji2: emoji2
+                                    });
+                                }
+                            }
+
+                            RowLayout {
+                                id: selectionRow
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.leftMargin: 16
+                                anchors.rightMargin: 16
+                                spacing: 16
+                                clip: true
+
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+
+                                ColumnLayout {
+                                    spacing: 8
+                                    Layout.alignment: Qt.AlignVCenter
+
+                                    Rectangle {
+                                        id: slot1
+                                        width: kitchenView.slotSize
+                                        height: kitchenView.slotSize
+                                        Layout.preferredWidth: kitchenView.slotSize
+                                        Layout.preferredHeight: kitchenView.slotSize
+                                        color: Kirigami.Theme.backgroundColor
+                                        border.color: (activeFocus || slot1MouseArea.containsMouse || kitchenView.emoji1 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                        border.width: (activeFocus || slot1MouseArea.containsMouse || kitchenView.emoji1 === "") ? 2 : 1
+                                        radius: 8
+
+                                        focusPolicy: Qt.StrongFocus
+                                        activeFocusOnTab: true
+                                        KeyNavigation.tab: randomizeSlot1Button
+                                        KeyNavigation.backtab: (categoryListView.currentItem || sidebarToggleButton)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: kitchenView.emoji1 === "" ? "?" : kitchenView.emoji1
+                                            font.pixelSize: kitchenView.emoji1 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
+                                            font.family: kitchenView.emoji1 === "" ? Kirigami.Theme.defaultFont.family : "Noto Color Emoji"
+                                            color: Kirigami.Theme.textColor
+                                            opacity: kitchenView.emoji1 === "" ? 0.2 : 1.0
+                                            renderType: kitchenView.emoji1 === "" ? Text.QtRendering : Text.NativeRendering
+                                        }
+
+                                        MouseArea {
+                                            id: slot1MouseArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                slot1.forceActiveFocus();
+                                                kitchenView.emoji1 = "";
+                                            }
+                                        }
+
+                                        Keys.onReturnPressed: kitchenView.emoji1 = ""
+                                        Keys.onEnterPressed: kitchenView.emoji1 = ""
+                                    }
+
+                                    PlasmaComponents.ToolButton {
+                                        id: randomizeSlot1Button
+                                        display: PlasmaComponents.ToolButton.IconOnly
+                                        icon.name: "roll-symbolic"
+                                        Layout.alignment: Qt.AlignHCenter
+                                        activeFocusOnTab: true
+                                        KeyNavigation.tab: slot2
+                                        KeyNavigation.backtab: slot1
+                                        onClicked: kitchenView.randomizeSlot1()
+                                        PlasmaComponents.ToolTip {
+                                            text: i18n("Randomize Slot 1")
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 8
+                                    Layout.alignment: Qt.AlignVCenter
+                                    Text {
+                                        text: "+"
+                                        font.pixelSize: 24
+                                        color: Kirigami.Theme.textColor
+                                        opacity: 0.6
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    Item {
+                                        Layout.preferredHeight: 32
+                                        Layout.preferredWidth: 1
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 8
+                                    Layout.alignment: Qt.AlignVCenter
+
+                                    Rectangle {
+                                        id: slot2
+                                        width: kitchenView.slotSize
+                                        height: kitchenView.slotSize
+                                        Layout.preferredWidth: kitchenView.slotSize
+                                        Layout.preferredHeight: kitchenView.slotSize
+                                        color: Kirigami.Theme.backgroundColor
+                                        border.color: (activeFocus || slot2MouseArea.containsMouse || kitchenView.emoji2 !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                        border.width: (activeFocus || slot2MouseArea.containsMouse || kitchenView.emoji2 === "") ? 2 : 1
+                                        radius: 8
+
+                                        focusPolicy: Qt.StrongFocus
+                                        activeFocusOnTab: true
+                                        KeyNavigation.tab: randomizeSlot2Button
+                                        KeyNavigation.backtab: randomizeSlot1Button
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: kitchenView.emoji2 === "" ? "?" : kitchenView.emoji2
+                                            font.pixelSize: kitchenView.emoji2 === "" ? Math.floor(kitchenView.slotSize * 0.6) : Math.floor(kitchenView.slotSize * 0.85)
+                                            font.family: kitchenView.emoji2 === "" ? Kirigami.Theme.defaultFont.family : "Noto Color Emoji"
+                                            color: Kirigami.Theme.textColor
+                                            opacity: kitchenView.emoji2 === "" ? 0.2 : 1.0
+                                            renderType: kitchenView.emoji2 === "" ? Text.QtRendering : Text.NativeRendering
+                                        }
+
+                                        MouseArea {
+                                            id: slot2MouseArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                slot2.forceActiveFocus();
+                                                kitchenView.emoji2 = "";
+                                            }
+                                        }
+
+                                        Keys.onReturnPressed: kitchenView.emoji2 = ""
+                                        Keys.onEnterPressed: kitchenView.emoji2 = ""
+                                    }
+
+                                    PlasmaComponents.ToolButton {
+                                        id: randomizeSlot2Button
+                                        display: PlasmaComponents.ToolButton.IconOnly
+                                        icon.name: "roll-symbolic"
+                                        Layout.alignment: Qt.AlignHCenter
+                                        activeFocusOnTab: true
+                                        KeyNavigation.tab: resultSlot
+                                        KeyNavigation.backtab: slot2
+                                        onClicked: kitchenView.randomizeSlot2()
+                                        PlasmaComponents.ToolTip {
+                                            text: i18n("Randomize Slot 2")
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 8
+                                    Layout.alignment: Qt.AlignVCenter
+                                    Text {
+                                        text: "="
+                                        font.pixelSize: 24
+                                        color: Kirigami.Theme.textColor
+                                        opacity: 0.6
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    Item {
+                                        Layout.preferredHeight: 32
+                                        Layout.preferredWidth: 1
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 8
+                                    Layout.alignment: Qt.AlignVCenter
+
+                                    Rectangle {
+                                        id: resultSlot
+                                        width: kitchenView.slotSize
+                                        height: kitchenView.slotSize
+                                        Layout.preferredWidth: kitchenView.slotSize
+                                        Layout.preferredHeight: kitchenView.slotSize
+                                        color: Kirigami.Theme.backgroundColor
+                                        border.color: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl !== "") ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                        border.width: (activeFocus || resultSlotArea.containsMouse || kitchenView.resultUrl === "") ? 2 : 1
+                                        radius: 8
+
+                                        focusPolicy: Qt.StrongFocus
+                                        activeFocusOnTab: true
+                                        KeyNavigation.tab: randomizeResultButton
+                                        KeyNavigation.backtab: randomizeSlot2Button
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "?"
+                                            font.pixelSize: Math.floor(kitchenView.slotSize * 0.6)
+                                            color: Kirigami.Theme.textColor
+                                            opacity: 0.2 * (1.0 - resultImage.opacity)
+                                        }
+
+                                        Image {
+                                            id: resultImage
+                                            anchors.fill: parent
+                                            anchors.margins: 8
+                                            source: kitchenView._actualSource
+                                            sourceSize: Qt.size(512, 512)
+                                            fillMode: Image.PreserveAspectFit
+                                            opacity: (status === Image.Ready && kitchenView.resultUrl !== "") ? 1.0 : 0.0
+                                            smooth: true
+                                            mipmap: true
+                                            asynchronous: true
+
+                                            Behavior on opacity {
+                                                NumberAnimation {
+                                                    duration: 150
+                                                }
+                                            }
+
+                                            onStatusChanged: {
+                                                if (status === Image.Ready) {
+                                                    kitchenView.currentValidUrl = source.toString();
+                                                } else if (status === Image.Error) {
+                                                    if (kitchenView.currentCandidateIndex + 1 < kitchenView.candidatesList.length) {
+                                                        kitchenView.currentCandidateIndex += 1;
+                                                        kitchenView._actualSource = kitchenView.candidatesList[kitchenView.currentCandidateIndex];
+                                                    } else {
+                                                        kitchenView.currentValidUrl = "";
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        HoverHandler {
+                                            id: resultSlotHover
+                                            cursorShape: kitchenView.currentValidUrl !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        }
+
+                                        MouseArea {
+                                            id: resultSlotArea
+                                            anchors.fill: parent
+                                            enabled: kitchenView.currentValidUrl !== ""
+                                            acceptedButtons: Qt.LeftButton
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                resultSlot.forceActiveFocus();
+                                                kitchenView.copyResult();
+                                            }
+                                        }
+
+                                        PlasmaComponents.ToolButton {
+                                            anchors.top: parent.top
+                                            anchors.right: parent.right
+                                            anchors.margins: 4
+                                            icon.name: fullRoot.isFavoriteItem("kitchen", {
+                                                url: kitchenView.currentValidUrl
+                                            }) ? "bookmarks-bookmarked" : "bookmarks"
+                                            visible: resultSlotHover.hovered && kitchenView.currentValidUrl !== ""
+                                            width: 24
+                                            height: 24
+                                            display: PlasmaComponents.ToolButton.IconOnly
+                                            z: 10
+                                            background: Rectangle {
+                                                color: parent.pressed ? Kirigami.Theme.highlightColor : (parent.hovered ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.35) : Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.85))
+                                                radius: 4
+                                                border.color: (parent.pressed || parent.hovered) ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                                border.width: 1
+                                            }
+
+                                            onClicked: {
+                                                fullRoot.toggleFavoriteItem("kitchen", {
+                                                    url: kitchenView.currentValidUrl,
+                                                    emoji1: kitchenView.emoji1,
+                                                    emoji2: kitchenView.emoji2
+                                                });
+                                            }
+                                        }
+
+                                        Keys.onReturnPressed: if (kitchenView.currentValidUrl !== "")
+                                        kitchenView.copyResult()
+                                        Keys.onEnterPressed: if (kitchenView.currentValidUrl !== "")
+                                        kitchenView.copyResult()
+                                    }
+
+                                    PlasmaComponents.ToolButton {
+                                        id: randomizeResultButton
+                                        display: PlasmaComponents.ToolButton.IconOnly
+                                        icon.name: "roll-symbolic"
+                                        Layout.alignment: Qt.AlignHCenter
+                                        activeFocusOnTab: true
+                                        KeyNavigation.tab: kitchenGridView
+                                        KeyNavigation.backtab: resultSlot
+                                        onClicked: kitchenView.randomize()
+                                        PlasmaComponents.ToolTip {
+                                            text: i18n("Randomize Result")
+                                        }
+                                    }
+                                }
+
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+                            }
+
+                            Kirigami.Separator {
+                                id: gridSeparator
+                                anchors.top: selectionRow.bottom
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.topMargin: 8
+                            }
+
+                            GridView {
+                                id: kitchenGridView
+                                anchors.top: gridSeparator.bottom
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: Math.ceil(count / Math.max(1, Math.floor(width / cellWidth))) * cellHeight
+                                cellWidth: fullRoot.internalGridSize
+                                cellHeight: fullRoot.internalGridSize
+                                clip: false
+                                interactive: false
+                                cacheBuffer: 1000000
+                                property var kitchenFilteredEmojis: {
+                                    if (fullRoot.filter && fullRoot.filter.trim() !== "") {
+                                        return fullRoot.performFilter(fullRoot.kitchenEmojiList, fullRoot.filter);
+                                    } else {
+                                        return fullRoot.kitchenEmojiList;
+                                    }
+                                }
+                                model: kitchenFilteredEmojis
+
+                                activeFocusOnTab: true
+                                KeyNavigation.tab: searchField
+                                KeyNavigation.backtab: randomizeResultButton
+
+                                keyNavigationEnabled: fullRoot.emojiKeyboardNavigationEnabled
+                                keyNavigationWraps: fullRoot.emojiKeyboardNavigationEnabled
+
+
+
+                                HoverHandler {
+                                    id: kitchenGridHoverHandler
+                                    onHoveredChanged: {
+                                        fullRoot.gridIsMouseOver = hovered;
+                                        if (!hovered && fullRoot.emojiHoveredEmojiKey !== "") {
+                                            fullRoot.emojiLastHoveredEmojiKey = fullRoot.emojiHoveredEmojiKey;
+                                            fullRoot.emojiHoveredEmojiKey = "";
+                                            fullRoot.hoveredEmojiName = "";
+                                        }
+                                    }
+                                }
+
+                                property bool keyboardActionPressed: false
+
+                                Timer {
+                                    id: keyboardReleaseTimer
+                                    interval: 150
+                                    onTriggered: kitchenGridView.keyboardActionPressed = false
+                                }
+
+                                Keys.onPressed: function (event) {
+                                    if (!fullRoot.emojiKeyboardNavigationEnabled)
+                                    return;
+                                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                        if (currentIndex >= 0 && currentIndex < kitchenFilteredEmojis.length) {
+                                            kitchenView.emoji1 = kitchenFilteredEmojis[currentIndex].emoji;
+                                        }
+                                        keyboardActionPressed = true;
+                                        keyboardReleaseTimer.restart();
+                                        event.accepted = true;
+                                    } else if (event.key === Qt.Key_Space) {
+                                        if (currentIndex >= 0 && currentIndex < kitchenFilteredEmojis.length) {
+                                            kitchenView.emoji2 = kitchenFilteredEmojis[currentIndex].emoji;
+                                        }
+                                        keyboardActionPressed = true;
+                                        keyboardReleaseTimer.restart();
+                                        event.accepted = true;
+                                    } else if (event.key === Qt.Key_Escape) {
+                                        handleEscapePressed();
+                                        event.accepted = true;
+                                    } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                                        const backwards = (event.key === Qt.Key_Backtab) || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier));
+                                        if (!backwards) {
+                                            searchField.forceActiveFocus();
+                                            event.accepted = true;
+                                        } else {
+                                            randomizeResultButton.forceActiveFocus();
+                                            event.accepted = true;
+                                        }
+                                    }
+                                }
+
+
+
+                                function updateKeyboardHover() {
+                                    if (!fullRoot.emojiKeyboardNavigationEnabled)
+                                    return;
+                                    if (currentIndex >= 0 && currentIndex < kitchenFilteredEmojis.length) {
+                                        const item = kitchenFilteredEmojis[currentIndex];
+                                        if (item) {
+                                            if (fullRoot.emojiHoveredEmojiKey !== item.emoji) {
+                                                fullRoot.emojiHoveredEmojiKey = item.emoji;
+                                                fullRoot.hoveredEmojiName = item.name;
+                                                fullRoot.emojiHoveredEmojiType = "kitchen";
+                                            }
+                                            if (fullRoot.emojiLastHoveredEmojiKey !== item.emoji) {
+                                                fullRoot.emojiLastHoveredEmojiKey = item.emoji;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                function clearKeyboardHover() {
+                                    if (fullRoot.emojiHoveredEmojiKey !== "") {
+                                        fullRoot.emojiHoveredEmojiKey = "";
+                                        fullRoot.hoveredEmojiName = "";
+                                    }
+                                }
+
+                                onActiveFocusChanged: {
+                                    if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
+                                        if (count > 0) {
+                                            if (currentIndex < 0 || currentIndex >= count) {
+                                                currentIndex = 0;
+                                            } else {
+                                                updateKeyboardHover();
+                                            }
+                                        }
+                                    } else if (!activeFocus) {
+                                        clearKeyboardHover();
+                                    }
+                                }
+
+                                onCurrentIndexChanged: {
+                                    if (activeFocus && fullRoot.emojiKeyboardNavigationEnabled) {
+                                        updateKeyboardHover();
+                                    }
+                                }
+
+                                delegate: Item {
+                                    width: fullRoot.internalGridSize
+                                    height: fullRoot.internalGridSize
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        anchors.margins: 2
+                                        color: Kirigami.Theme.highlightColor
+                                        radius: 4
+                                        opacity: (mouseArea.pressed || (kitchenGridView.activeFocus && kitchenGridView.currentIndex === index && kitchenGridView.keyboardActionPressed)) ? 1.0 : (mouseArea.containsMouse || (kitchenGridView.activeFocus && (kitchenGridView.currentIndex === index || (fullRoot.emojiLastHoveredEmojiKey === modelData.emoji && !true)))) ? 0.2 : 0
+                                    }
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        color: "transparent"
+                                        radius: 4
+                                        border.width: (mouseArea.pressed || (kitchenGridView.activeFocus && kitchenGridView.currentIndex === index && kitchenGridView.keyboardActionPressed) || mouseArea.containsMouse || (kitchenGridView.activeFocus && (kitchenGridView.currentIndex === index || (fullRoot.emojiLastHoveredEmojiKey === modelData.emoji && !true)))) ? 2 : 0
+                                        border.color: Kirigami.Theme.highlightColor
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.emoji
+                                        font.pixelSize: Math.floor(fullRoot.internalGridSize * 0.81)
+                                        font.family: "Noto Color Emoji"
+                                        renderType: Text.NativeRendering
+                                    }
+
+                                    MouseArea {
+                                        id: mouseArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                        onEntered: {
+                                            fullRoot.emojiHoveredEmojiKey = modelData.emoji;
+                                            fullRoot.hoveredEmojiName = modelData.name;
+                                            fullRoot.emojiHoveredEmojiType = "kitchen";
+                                            if (fullRoot.emojiKeyboardNavigationEnabled) {
+                                                kitchenGridView.currentIndex = index;
+                                            }
+                                        }
+                                        onExited: {
+                                            if (fullRoot.emojiHoveredEmojiKey === modelData.emoji) {
+                                                fullRoot.emojiLastHoveredEmojiKey = modelData.emoji;
+                                            }
+                                        }
+                                        onClicked: function (mouse) {
+                                            if (mouse.button === Qt.LeftButton) {
+                                                kitchenView.emoji1 = modelData.emoji;
+                                            } else if (mouse.button === Qt.RightButton) {
+                                                kitchenView.emoji2 = modelData.emoji;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Kirigami.Separator {
+                            width: parent.width
+                            opacity: 0.3
+                        }
+                    }
+                }
+
+
+                Repeater {
+                    id: allEmojisRepeater
+                    model: ["Favorites", "Recent", "Smileys & Emotion", "People & Body", "Animals & Nature", "Food & Drink", "Activities", "Travel & Places", "Objects", "Symbols", "Flags"]
+                    delegate: Column {
+                        width: parent.width
+                        spacing: 0
+                        property string catName: modelData
+                        property var catEmojis: {
+                            let sourceList = [];
+                            if (catName === "Favorites") {
+                                sourceList = (fullRoot.favoriteEmojis || []).filter(e => !e.type || e.type === "emoji");
+                            } else if (catName === "Recent") {
+                                sourceList = (fullRoot.recentEmojis || []).filter(e => !e.type || e.type === "emoji").slice(0, 36);
+                            } else {
+                                sourceList = fullRoot.filteredEmojiByGroup[modelData] || [];
+                            }
+                            
+                            if ((catName === "Favorites" || catName === "Recent") && fullRoot.filter && fullRoot.filter.trim() !== "") {
+                                return performFilter(sourceList, fullRoot.filter);
+                            }
+                            return sourceList;
+                        }
+
+                        property var catKitchens: {
+                            if (catName !== "Favorites" && catName !== "Recent") return [];
+                            let sourceList = [];
+                            if (catName === "Favorites") {
+                                sourceList = (fullRoot.favoriteEmojis || []).filter(e => e.type === "kitchen");
+                            } else if (catName === "Recent") {
+                                sourceList = (fullRoot.recentEmojis || []).filter(e => e.type === "kitchen").slice(0, 36);
+                            }
+                            
+                            if (fullRoot.filter && fullRoot.filter.trim() !== "") {
+                                let lowerFilter = fullRoot.filter.toLowerCase().trim();
+                                return sourceList.filter(e => {
+                                    let matchStr = "kitchen mashup " + (e.emoji1 || "") + " " + (e.emoji2 || "");
+                                    return matchStr.indexOf(lowerFilter) !== -1;
+                                });
+                            }
+                            return sourceList;
+                        }
+                        visible: catEmojis.length > 0 || catKitchens.length > 0
 
                                         Item {
                                             id: catHeader
@@ -3635,7 +3720,7 @@ PlasmoidItem {
                                                     PlasmaComponents.Label {
                                                         id: catCountLabel
                                                         anchors.centerIn: parent
-                                                        text: catEmojis.length
+                                                        text: catEmojis.length + catKitchens.length
                                                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                                                         font.bold: true
                                                         color: Kirigami.Theme.highlightColor
@@ -3652,12 +3737,22 @@ PlasmoidItem {
                                                 id: catHeaderMouse
                                                 anchors.fill: parent
                                                 hoverEnabled: true
+                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
                                                 cursorShape: Qt.PointingHandCursor
-                                                onClicked: {
-                                                    let currentlyExpanded = allEmojisView.categoryStates[catName] !== false;
-                                                    allEmojisView.toggleCategory(catName);
-                                                    if (!currentlyExpanded) {
-                                                        allEmojisView.scrollToCategory(catName);
+                                                onClicked: function(mouse) {
+                                                    if (mouse.button === Qt.LeftButton) {
+                                                        let currentlyExpanded = allEmojisView.categoryStates[catName] !== false;
+                                                        allEmojisView.toggleCategory(catName);
+                                                        if (!currentlyExpanded) {
+                                                            allEmojisView.scrollToCategory(catName);
+                                                        }
+                                                    } else if (mouse.button === Qt.RightButton) {
+                                                        var globalPos = catHeaderMouse.mapToItem(fullRoot, mouse.x, mouse.y);
+                                                        if (catName === "Recent") {
+                                                            recentContextMenu.popup(globalPos.x, globalPos.y);
+                                                        } else if (catName === "Favorites") {
+                                                            favoritesContextMenu.popup(globalPos.x, globalPos.y);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -3713,6 +3808,7 @@ PlasmoidItem {
                                                         onEntered: {
                                                             fullRoot.emojiHoveredEmojiKey = modelData.emoji;
                                                             fullRoot.hoveredEmojiName = modelData.name;
+                                                            fullRoot.emojiHoveredEmojiType = "emoji";
                                                         }
 
                                                         onExited: {
@@ -3736,6 +3832,104 @@ PlasmoidItem {
                                                         onPressAndHold: function (mouse) {
                                                             var globalPos = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y);
                                                             handleEmojiRightClicked(modelData.emoji, modelData, globalPos);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Flow {
+                                            width: parent.width
+                                            spacing: 8
+                                            visible: catHeader.isExpanded && catKitchens.length > 0
+
+                                            Item {
+                                                width: parent.width
+                                                height: catEmojis.length > 0 ? 8 : 0
+                                                visible: catEmojis.length > 0
+                                            }
+
+                                            Repeater {
+                                                model: catKitchens
+
+                                                delegate: Item {
+                                                    width: Math.max(48, Math.floor(fullRoot.internalGridSize * 1.2))
+                                                    height: Math.max(48, Math.floor(fullRoot.internalGridSize * 1.2))
+
+                                                    Rectangle {
+                                                        anchors.fill: parent
+                                                        color: Kirigami.Theme.alternateBackgroundColor
+                                                        border.color: (kitchenHoverHandler.hovered || kitchenMouseArea.pressed) ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                                        border.width: (kitchenHoverHandler.hovered || kitchenMouseArea.pressed) ? 2 : 1
+                                                        radius: 8
+
+                                                        Image {
+                                                            anchors.fill: parent
+                                                            anchors.margins: 4
+                                                            source: modelData.url
+                                                            sourceSize: Qt.size(128, 128)
+                                                            fillMode: Image.PreserveAspectFit
+                                                            smooth: true
+                                                            mipmap: true
+                                                        }
+
+                                                        HoverHandler {
+                                                            id: kitchenHoverHandler
+                                                            onHoveredChanged: {
+                                                                if (hovered) {
+                                                                    fullRoot.emojiHoveredEmojiKey = (modelData.emoji1 && modelData.emoji2) ? (modelData.emoji1 + " + " + modelData.emoji2) : "";
+                                                                    fullRoot.hoveredEmojiName = (modelData.emoji1 && modelData.emoji2) ? i18n("Emoji Kitchen Mashup (%1 + %2)", modelData.emoji1, modelData.emoji2) : i18n("Emoji Kitchen Mashup");
+                                                                    fullRoot.emojiHoveredEmojiType = "kitchen";
+                                                                    fullRoot.emojiHoveredKitchenUrl = modelData.url;
+                                                                }
+                                                            }
+                                                        }
+
+                                                        MouseArea {
+                                                            id: kitchenMouseArea
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: function(mouse) {
+                                                                if (mouse.button === Qt.LeftButton) {
+                                                                    let cmd = 'curl -sL "' + modelData.url + '" > /tmp/kmoji_copy.png && (wl-copy --type image/png < /tmp/kmoji_copy.png || xclip -selection clipboard -t image/png -i /tmp/kmoji_copy.png)';
+                                                                    shellSource.connectSource(cmd);
+                                                                    showPasteTemporaryMessage(i18n("Copied mashup to clipboard!"));
+
+                                                                    fullRoot.addRecentItem("kitchen", modelData);
+
+                                                                    if (plasmoid.configuration.CloseAfterSelection) {
+                                                                        if (fullRoot.plasmoidItem)
+                                                                            fullRoot.plasmoidItem.expanded = false;
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+
+                                                        PlasmaComponents.ToolButton {
+                                                            anchors.top: parent.top
+                                                            anchors.right: parent.right
+                                                            anchors.margins: 2
+                                                            icon.name: fullRoot.isFavoriteItem("kitchen", {
+                                                                url: modelData.url
+                                                            }) ? "bookmarks-bookmarked" : "bookmarks"
+                                                            visible: kitchenHoverHandler.hovered
+                                                            width: 18
+                                                            height: 18
+                                                            display: PlasmaComponents.ToolButton.IconOnly
+                                                            z: 10
+
+                                                            background: Rectangle {
+                                                                color: parent.pressed ? Kirigami.Theme.highlightColor : (parent.hovered ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.35) : Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.85))
+                                                                radius: 3
+                                                                border.color: (parent.pressed || parent.hovered) ? Kirigami.Theme.highlightColor : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
+                                                                border.width: 1
+                                                            }
+
+                                                            onClicked: {
+                                                                fullRoot.toggleFavoriteItem("kitchen", modelData);
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -3834,7 +4028,7 @@ PlasmoidItem {
                         ScrollView {
                             id: favRecentsView
                             anchors.fill: parent
-                            visible: fullRoot.selectedCategory === fullRoot.catFavorites || fullRoot.selectedCategory === fullRoot.catRecent
+                            visible: false
                             clip: true
 
                             readonly property int countEmojis: fullRoot.activeEmojis.length
@@ -4348,11 +4542,21 @@ PlasmoidItem {
                             Text {
                                 anchors.centerIn: parent
                                 text: fullRoot.emojiHoveredEmojiKey
-                                font.pixelSize: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? Math.floor((previewBar.height - 20) * 1.18) : (previewBar.height - 20)
-                                font.family: fullRoot.selectedCategory === fullRoot.catEmojiKitchen ? "Noto Color Emoji" : ""
-                                visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.emojiHoveredEmojiKey !== ""
+                                font.pixelSize: (fullRoot.selectedCategory === fullRoot.catEmojiKitchen || fullRoot.emojiHoveredEmojiType === "kitchen") ? Math.floor((previewBar.height - 20) * 1.18) : (previewBar.height - 20)
+                                font.family: (fullRoot.selectedCategory === fullRoot.catEmojiKitchen || fullRoot.emojiHoveredEmojiType === "kitchen") ? "Noto Color Emoji" : Kirigami.Theme.defaultFont.family
+                                visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.emojiHoveredEmojiKey !== "" && fullRoot.emojiHoveredKitchenUrl === ""
                                 color: Kirigami.Theme.textColor
                                 renderType: Text.NativeRendering
+                            }
+
+                            Image {
+                                anchors.fill: parent
+                                anchors.margins: 2
+                                source: fullRoot.emojiHoveredKitchenUrl
+                                sourceSize: Qt.size(128, 128)
+                                fillMode: Image.PreserveAspectFit
+                                visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.emojiHoveredKitchenUrl !== ""
+                                smooth: true
                             }
 
                             AnimatedImage {
@@ -4369,7 +4573,7 @@ PlasmoidItem {
                                 width: parent.height
                                 height: parent.height
                                 color: Kirigami.Theme.disabledTextColor
-                                visible: fullRoot.selectedCategory === fullRoot.catGifs ? (fullRoot.hoveredGifUrl === "") : (fullRoot.emojiHoveredEmojiKey === "")
+                                visible: fullRoot.selectedCategory === fullRoot.catGifs ? (fullRoot.hoveredGifUrl === "") : (fullRoot.emojiHoveredEmojiKey === "" && fullRoot.emojiHoveredKitchenUrl === "")
                             }
                         }
 
