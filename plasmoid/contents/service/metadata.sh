@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# emoji_metadata.sh
+# metadata.sh
 #
 # Description:
 #   1. Downloads the latest emoji-test.txt from Unicode, parses it to extract
 #      fully-qualified emojis (excluding the Component group), and generates
 #      emoji-list.js in the assets directory.
 #   2. Downloads the latest Emoji Kitchen metadata from emojikitchen.dev,
-#      optimizes it by removing redundant fields, and generates kitchen-metadata.js.
+#      optimizes it by removing redundant fields, and generates emoji-kitchen-list.js.
 #
 # Requirements:
 #   - curl
@@ -16,7 +16,7 @@
 #   - date
 #
 # Usage:
-#   bash emoji_metadata.sh
+#   bash metadata.sh
 # ==============================================================================
 
 set -euo pipefail
@@ -37,7 +37,7 @@ ASSETS_DIR="$(cd "$SERVICE_DIR/../assets" && pwd)"
 
 RAW_FILE_PATH="$(mktemp)"
 JS_FILE_PATH="$ASSETS_DIR/emoji-list.js"
-KITCHEN_JS_FILE_PATH="$ASSETS_DIR/kitchen-metadata.js"
+KITCHEN_JS_FILE_PATH="$ASSETS_DIR/emoji-kitchen-list.js"
 
 trap 'rm -f "$RAW_FILE_PATH"' EXIT
 

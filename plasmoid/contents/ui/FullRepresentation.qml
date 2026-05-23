@@ -15,7 +15,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasma5support as Plasma5Support
 
 import "../assets/emoji-list.js" as EmojiList
-import "../assets/kitchen-metadata.js" as KitchenMetadata
+import "../assets/emoji-kitchen-list.js" as KitchenMetadata
 
 Item {
     id: fullRoot

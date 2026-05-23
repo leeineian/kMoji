@@ -9,7 +9,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as Plasma5Support
 
 import "../../assets/emoji-list.js" as EmojiList
-import "../../assets/emoji-icons.js" as EmojiIcons
+import "../../service/functions.js" as EmojiIcons
 
 Kirigami.ScrollablePage {
     id: root
@@ -348,7 +348,7 @@ Kirigami.ScrollablePage {
         }
 
         function executeScript() {
-            const scriptUrl = Qt.resolvedUrl('../../service/emoji_metadata.sh')
+            const scriptUrl = Qt.resolvedUrl('../../service/metadata.sh')
             let path = scriptUrl.toString()
 
             if (path.startsWith("file://")) {
