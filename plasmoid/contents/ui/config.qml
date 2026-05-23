@@ -9,7 +9,6 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasma5support as Plasma5Support
 
 import "../assets/emoji-metadata.js" as EmojiList
-import "../service/modules.js" as EmojiIcons
 
 Kirigami.ScrollablePage {
     id: root
@@ -17,6 +16,29 @@ Kirigami.ScrollablePage {
     // =========================================================================
     // Properties & Helpers
     // =========================================================================
+
+    property var _cachedEmojis: null
+
+    function getIconEmojis(emojiList) {
+        if (_cachedEmojis) {
+            return _cachedEmojis;
+        }
+
+        var allEmojis = [];
+        var list = emojiList;
+
+        for (var category in list) {
+            var categoryData = list[category];
+            if (categoryData) {
+                for (var i = 0; i < categoryData.length; i++) {
+                    allEmojis.push(categoryData[i].emoji);
+                }
+            }
+        }
+
+        _cachedEmojis = allEmojis;
+        return allEmojis;
+    }
 
     property string smallSizeEmojiLabel: i18n("Small")
     property string largeSizeEmojiLabel: i18n("Large")
@@ -34,7 +56,7 @@ Kirigami.ScrollablePage {
     }
 
     function _randomEmojiFromPool() {
-        const pool = EmojiIcons.getIconEmojis(EmojiList.emojiList) || []
+        const pool = getIconEmojis(EmojiList.emojiList) || []
         if (pool.length === 0) {
             return null
         }
