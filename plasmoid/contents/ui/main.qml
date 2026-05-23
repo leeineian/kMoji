@@ -120,7 +120,7 @@ PlasmoidItem {
         Layout.preferredWidth: Kirigami.Units.gridUnit * 35
         Layout.preferredHeight: Kirigami.Units.gridUnit * 35
 
-        Layout.minimumHeight: Math.max(Kirigami.Units.gridUnit * 24, fullRepresentationView ? fullRepresentationView.minimumRequiredHeight : Kirigami.Units.gridUnit * 30)
+        Layout.minimumHeight: Math.max(Kirigami.Units.gridUnit * 24, fullRepresentationView.item ? fullRepresentationView.item.minimumRequiredHeight : Kirigami.Units.gridUnit * 30)
 
         Loader {
             id: fullRepresentationView
@@ -794,7 +794,7 @@ PlasmoidItem {
                 } else if (type === "gif") {
                     label = item.title || "Klipy GIF";
                 } else if (type === "kitchen") {
-                    label = i18n("Emoji Kitchen Mashup (%1 + %2)", item.emoji1, item.emoji2);
+                    label = i18n("(%1 + %2)", item.emoji1, item.emoji2);
                 }
 
                 showSearchTemporaryMessage(isFavoriteNow ? i18n("Favorited: %1", label) : i18n("Unfavorited: %1", label));
@@ -2643,10 +2643,10 @@ PlasmoidItem {
 
                                                 Rectangle {
                                                     anchors.fill: parent
-                                                    color: Kirigami.Theme.highlightColor
-                                                    opacity: catHeaderMouse.containsMouse ? 0.1 : 0
+                                                    color: catHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (catHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                                    border.color: (catHeaderMouse.pressed || catHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                                    border.width: 1
                                                     radius: 4
-                                                    Behavior on opacity { NumberAnimation { duration: 150 } }
                                                 }
 
                                                 RowLayout {
@@ -2684,12 +2684,14 @@ PlasmoidItem {
                                                             text: catGifs.length
                                                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                                                             font.bold: true
-                                                            color: Kirigami.Theme.highlightColor
+                                                            color: Kirigami.Theme.textColor
                                                         }
                                                     }
 
-                                                    Kirigami.Separator {
+                                                    Rectangle {
                                                         Layout.fillWidth: true
+                                                        height: 1
+                                                        color: Kirigami.Theme.textColor
                                                         opacity: 0.3
                                                     }
                                                 }
@@ -2698,8 +2700,13 @@ PlasmoidItem {
                                                     id: catHeaderMouse
                                                     anchors.fill: parent
                                                     hoverEnabled: true
+                                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                                                     cursorShape: Qt.PointingHandCursor
-                                                    onClicked: catHeader.isExpanded = !catHeader.isExpanded
+                                                    onClicked: function(mouse) {
+                                                        if (mouse.button === Qt.LeftButton) {
+                                                            catHeader.isExpanded = !catHeader.isExpanded;
+                                                        }
+                                                    }
                                                 }
                                             }
 
@@ -2891,14 +2898,10 @@ PlasmoidItem {
 
                                         Rectangle {
                                             anchors.fill: parent
-                                            color: Kirigami.Theme.highlightColor
-                                            opacity: kitchenCatHeaderMouse.containsMouse ? 0.1 : 0
+                                            color: kitchenCatHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (kitchenCatHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                            border.color: (kitchenCatHeaderMouse.pressed || kitchenCatHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                            border.width: 1
                                             radius: 4
-                                            Behavior on opacity {
-                                                NumberAnimation {
-                                                    duration: 150
-                                                }
-                                            }
                                         }
 
                                         RowLayout {
@@ -2924,8 +2927,10 @@ PlasmoidItem {
                                                 font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
                                             }
 
-                                            Kirigami.Separator {
+                                            Rectangle {
                                                 Layout.fillWidth: true
+                                                height: 1
+                                                color: Kirigami.Theme.textColor
                                                 opacity: 0.3
                                             }
                                         }
@@ -2934,12 +2939,11 @@ PlasmoidItem {
                                             id: kitchenCatHeaderMouse
                                             anchors.fill: parent
                                             hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                let currentlyExpanded = allEmojisView.categoryStates[emojiKitchenSection.catName] !== false;
-                                                allEmojisView.toggleCategory(emojiKitchenSection.catName);
-                                                if (!currentlyExpanded) {
-                                                    allEmojisView.scrollToCategory(emojiKitchenSection.catName);
+                                            onClicked: function(mouse) {
+                                                if (mouse.button === Qt.LeftButton) {
+                                                    allEmojisView.toggleCategory(emojiKitchenSection.catName);
                                                 }
                                             }
                                         }
@@ -3698,14 +3702,10 @@ PlasmoidItem {
 
                                             Rectangle {
                                                 anchors.fill: parent
-                                                color: Kirigami.Theme.highlightColor
-                                                opacity: catHeaderMouse.containsMouse ? 0.1 : 0
+                                                color: catHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (catHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                                border.color: (catHeaderMouse.pressed || catHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                                border.width: 1
                                                 radius: 4
-                                                Behavior on opacity {
-                                                    NumberAnimation {
-                                                        duration: 150
-                                                    }
-                                                }
                                             }
 
                                             RowLayout {
@@ -3743,29 +3743,27 @@ PlasmoidItem {
                                                         text: catEmojis.length + catKitchens.length
                                                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                                                         font.bold: true
-                                                        color: Kirigami.Theme.highlightColor
+                                                        color: Kirigami.Theme.textColor
                                                     }
                                                 }
 
-                                                Kirigami.Separator {
-                                                    Layout.fillWidth: true
-                                                    opacity: 0.3
-                                                }
+                                                Rectangle {
+                                                     Layout.fillWidth: true
+                                                     height: 1
+                                                     color: Kirigami.Theme.textColor
+                                                     opacity: 0.3
+                                                 }
                                             }
 
                                             MouseArea {
                                                 id: catHeaderMouse
                                                 anchors.fill: parent
                                                 hoverEnabled: true
-                                                acceptedButtons: Qt.LeftButton
+                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: function(mouse) {
                                                     if (mouse.button === Qt.LeftButton) {
-                                                        let currentlyExpanded = allEmojisView.categoryStates[catName] !== false;
                                                         allEmojisView.toggleCategory(catName);
-                                                        if (!currentlyExpanded) {
-                                                            allEmojisView.scrollToCategory(catName);
-                                                        }
                                                     }
                                                 }
                                             }
@@ -3851,16 +3849,16 @@ PlasmoidItem {
                                             }
                                         }
 
+                                        Item {
+                                            width: parent.width
+                                            height: 6
+                                            visible: catHeader.isExpanded && catEmojis.length > 0 && catKitchens.length > 0
+                                        }
+
                                         Flow {
                                             width: parent.width
                                             spacing: 8
                                             visible: catHeader.isExpanded && catKitchens.length > 0
-
-                                            Item {
-                                                width: parent.width
-                                                height: catEmojis.length > 0 ? 8 : 0
-                                                visible: catEmojis.length > 0
-                                            }
 
                                             Repeater {
                                                 model: catKitchens
@@ -3891,9 +3889,15 @@ PlasmoidItem {
                                                             onHoveredChanged: {
                                                                 if (hovered) {
                                                                     fullRoot.emojiHoveredEmojiKey = (modelData.emoji1 && modelData.emoji2) ? (modelData.emoji1 + " + " + modelData.emoji2) : "";
-                                                                    fullRoot.hoveredEmojiName = (modelData.emoji1 && modelData.emoji2) ? i18n("Emoji Kitchen Mashup (%1 + %2)", modelData.emoji1, modelData.emoji2) : i18n("Emoji Kitchen Mashup");
+                                                                    fullRoot.hoveredEmojiName = (modelData.emoji1 && modelData.emoji2) ? (modelData.emoji1 + " + " + modelData.emoji2) : i18n("Emoji Kitchen Mashup");
                                                                     fullRoot.emojiHoveredEmojiType = "kitchen";
                                                                     fullRoot.emojiHoveredKitchenUrl = modelData.url;
+                                                                } else {
+                                                                    if (fullRoot.emojiHoveredKitchenUrl === modelData.url) {
+                                                                        fullRoot.emojiHoveredEmojiKey = "";
+                                                                        fullRoot.hoveredEmojiName = "";
+                                                                        fullRoot.emojiHoveredKitchenUrl = "";
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -4099,14 +4103,10 @@ PlasmoidItem {
 
                                         Rectangle {
                                             anchors.fill: parent
-                                            color: Kirigami.Theme.highlightColor
-                                            opacity: emojisHeaderMouse.containsMouse ? 0.1 : 0
+                                            color: emojisHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (emojisHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                            border.color: (emojisHeaderMouse.pressed || emojisHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                            border.width: 1
                                             radius: 4
-                                            Behavior on opacity {
-                                                NumberAnimation {
-                                                    duration: 150
-                                                }
-                                            }
                                         }
 
                                         RowLayout {
@@ -4158,8 +4158,13 @@ PlasmoidItem {
                                             id: emojisHeaderMouse
                                             anchors.fill: parent
                                             hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: favRecentsView.toggleEmojisExpanded()
+                                            onClicked: function(mouse) {
+                                                if (mouse.button === Qt.LeftButton) {
+                                                    favRecentsView.toggleEmojisExpanded();
+                                                }
+                                            }
                                         }
                                     }
 
@@ -4249,14 +4254,10 @@ PlasmoidItem {
 
                                         Rectangle {
                                             anchors.fill: parent
-                                            color: Kirigami.Theme.highlightColor
-                                            opacity: gifsHeaderMouse.containsMouse ? 0.1 : 0
+                                            color: gifsHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (gifsHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                            border.color: (gifsHeaderMouse.pressed || gifsHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                            border.width: 1
                                             radius: 4
-                                            Behavior on opacity {
-                                                NumberAnimation {
-                                                    duration: 150
-                                                }
-                                            }
                                         }
 
                                         RowLayout {
@@ -4308,8 +4309,13 @@ PlasmoidItem {
                                             id: gifsHeaderMouse
                                             anchors.fill: parent
                                             hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: favRecentsView.toggleGifsExpanded()
+                                            onClicked: function(mouse) {
+                                                if (mouse.button === Qt.LeftButton) {
+                                                    favRecentsView.toggleGifsExpanded();
+                                                }
+                                            }
                                         }
                                     }
 
@@ -4371,14 +4377,10 @@ PlasmoidItem {
 
                                         Rectangle {
                                             anchors.fill: parent
-                                            color: Kirigami.Theme.highlightColor
-                                            opacity: kitchenHeaderMouse.containsMouse ? 0.1 : 0
+                                            color: kitchenHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (kitchenHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                            border.color: (kitchenHeaderMouse.pressed || kitchenHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                            border.width: 1
                                             radius: 4
-                                            Behavior on opacity {
-                                                NumberAnimation {
-                                                    duration: 150
-                                                }
-                                            }
                                         }
 
                                         RowLayout {
@@ -4430,8 +4432,13 @@ PlasmoidItem {
                                             id: kitchenHeaderMouse
                                             anchors.fill: parent
                                             hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: favRecentsView.toggleKitchenExpanded()
+                                            onClicked: function(mouse) {
+                                                if (mouse.button === Qt.LeftButton) {
+                                                    favRecentsView.toggleKitchenExpanded();
+                                                }
+                                            }
                                         }
                                     }
 
@@ -4466,6 +4473,20 @@ PlasmoidItem {
 
                                                     HoverHandler {
                                                         id: kitchenHoverHandler
+                                                        onHoveredChanged: {
+                                                            if (hovered) {
+                                                                fullRoot.emojiHoveredEmojiKey = (modelData.emoji1 && modelData.emoji2) ? (modelData.emoji1 + " + " + modelData.emoji2) : "";
+                                                                fullRoot.hoveredEmojiName = (modelData.emoji1 && modelData.emoji2) ? (modelData.emoji1 + " + " + modelData.emoji2) : i18n("Emoji Kitchen Mashup");
+                                                                fullRoot.emojiHoveredEmojiType = "kitchen";
+                                                                fullRoot.emojiHoveredKitchenUrl = modelData.url;
+                                                            } else {
+                                                                if (fullRoot.emojiHoveredKitchenUrl === modelData.url) {
+                                                                    fullRoot.emojiHoveredEmojiKey = "";
+                                                                    fullRoot.hoveredEmojiName = "";
+                                                                    fullRoot.emojiHoveredKitchenUrl = "";
+                                                                }
+                                                            }
+                                                        }
                                                     }
 
                                                     MouseArea {
@@ -4570,6 +4591,7 @@ PlasmoidItem {
                                 fillMode: Image.PreserveAspectFit
                                 visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.emojiHoveredKitchenUrl !== ""
                                 smooth: true
+                                mipmap: true
                             }
 
                             AnimatedImage {
