@@ -362,9 +362,13 @@ PlasmoidItem {
                     displayName: i18n("GIFs"),
                     icon: "fileview-preview-symbolic"
                 },
-
                 {
-                    name: catKaomoji, displayName: i18n("Kaomoji"), icon: "face-smile" }, { name: "Smileys & Emotion",
+                    name: catKaomoji,
+                    displayName: i18n("Kaomoji"),
+                    icon: "kstars_cbound-symbolic"
+                },
+                {
+                    name: "Smileys & Emotion",
                     displayName: i18n("Smileys & Emotion"),
                     icon: "smiley"
                 },
@@ -3087,7 +3091,6 @@ PlasmoidItem {
                             }
                         }
 
-                        
                         ScrollView {
                             id: kaomojiView
                             anchors.fill: parent
@@ -3316,7 +3319,7 @@ PlasmoidItem {
                         ScrollView {
                             id: allEmojisView
                             anchors.fill: parent
-                            visible: fullRoot.selectedCategory !== fullRoot.catGifs
+                            visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.selectedCategory !== fullRoot.catKaomoji
                             clip: true
 
                             property var categoryStates: ({})
@@ -4631,9 +4634,6 @@ PlasmoidItem {
                                 }
                             }
                         }
-
-                        Item {
-                            
                         // Floating sticky header for Kaomoji
                         Item {
                             id: floatingStickyHeaderKaomoji
