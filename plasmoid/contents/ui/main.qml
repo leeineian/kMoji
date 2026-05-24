@@ -16,6 +16,7 @@ import org.kde.plasma.plasma5support as Plasma5Support
 
 import "../assets/emoji-metadata.js" as EmojiList
 import "../assets/emoji-kitchen-metadata.js" as KitchenMetadata
+import "../assets/kaomoji-metadata.js" as KaomojiList
 
 // MAIN
 
@@ -275,7 +276,11 @@ PlasmoidItem {
 
             property string hoveredEmojiName: ""
             property int keyboardPressedIndex: -1
-            property string defaultPastePlaceholder: fullRoot.selectedCategory === fullRoot.catGifs ? i18n("Paste links…") : i18n("Paste emojis…")
+            property string defaultPastePlaceholder: {
+                if (fullRoot.selectedCategory === fullRoot.catGifs) return i18n("Paste links…");
+                if (fullRoot.selectedCategory === fullRoot.catKaomoji) return i18n("Paste kaomojis…");
+                return i18n("Paste emojis…");
+            }
             property string searchPlaceholderText: i18n("Search emojis…")
             property bool searchPlaceholderMessageActive: false
 
@@ -343,6 +348,7 @@ PlasmoidItem {
             readonly property string catRecent: "Recent"
             readonly property string catEmojiKitchen: "Emoji Kitchen"
             readonly property string catGifs: "GIFs"
+            readonly property string catKaomoji: "Kaomoji"
 
             property string hoveredGifTitle: ""
             property string hoveredGifUrl: ""
@@ -358,7 +364,7 @@ PlasmoidItem {
                 },
 
                 {
-                    name: "Smileys & Emotion",
+                    name: catKaomoji, displayName: i18n("Kaomoji"), icon: "face-smile" }, { name: "Smileys & Emotion",
                     displayName: i18n("Smileys & Emotion"),
                     icon: "smiley"
                 },
@@ -1472,7 +1478,9 @@ PlasmoidItem {
                 running: false
                 repeat: false
                 onTriggered: {
-                    var placeholder = (fullRoot.selectedCategory === fullRoot.catGifs) ? i18n("Paste links\u2026") : i18n("Paste emojis\u2026");
+                    var placeholder = i18n("Paste emojis…");
+                    if (fullRoot.selectedCategory === fullRoot.catGifs) placeholder = i18n("Paste links…");
+                    if (fullRoot.selectedCategory === fullRoot.catKaomoji) placeholder = i18n("Paste kaomojis…");
                     pasteField.placeholderText = placeholder;
                 }
             }
@@ -3079,6 +3087,232 @@ PlasmoidItem {
                             }
                         }
 
+                        
+                        ScrollView {
+                            id: kaomojiView
+                            anchors.fill: parent
+                            visible: fullRoot.selectedCategory === fullRoot.catKaomoji
+                            clip: true
+
+                            property var categoryStates: ({})
+                            property string currentFilter: fullRoot.searchFilter
+                            
+                            function toggleCategory(catName) {
+                                let states = Object.assign({}, categoryStates);
+                                states[catName] = !(states[catName] !== false);
+                                categoryStates = states;
+                            }
+
+                            readonly property var activeStickyInfo: {
+                                let cy = contentY;
+                                let column = contentItem.children[0];
+                                if (!column) return null;
+                                
+                                let activeItem = null;
+                                let activeY = 0;
+                                let nextY = Infinity;
+                                
+                                for (let p = 0; p < column.children.length; p++) {
+                                    let pCol = column.children[p];
+                                    if (!pCol || pCol.y === undefined) continue;
+                                    
+                                    for (let k = 0; k < pCol.children.length; k++) {
+                                        let subCol = pCol.children[k];
+                                        if (!subCol || subCol.y === undefined || !subCol.visible) continue;
+                                        
+                                        let header = subCol.children[0];
+                                        if (!header || header.height === undefined) continue;
+                                        
+                                        let absY = pCol.y + subCol.y; 
+                                        
+                                        if (absY <= cy) {
+                                            activeItem = subCol;
+                                            activeY = absY;
+                                        } else if (absY < nextY && absY > cy) {
+                                            nextY = absY;
+                                        }
+                                    }
+                                }
+                                
+                                if (!activeItem) return null;
+                                
+                                let headerH = 32;
+                                let offset = 0;
+                                if (nextY !== Infinity && (nextY - cy) < headerH) {
+                                    offset = (nextY - cy) - headerH;
+                                }
+                                
+                                return {
+                                    catName: activeItem.catName,
+                                    isExpanded: kaomojiView.categoryStates[activeItem.catName] !== false,
+                                    count: activeItem.filteredEmojis.length,
+                                    offset: offset
+                                };
+                            }
+
+                            Column {
+                                width: kaomojiView.width - (kaomojiView.ScrollBar.vertical.visible ? kaomojiView.ScrollBar.vertical.width : 0)
+                                spacing: 0
+
+                                Repeater {
+                                    model: KaomojiList.kaomojiList
+                                    delegate: Column {
+                                        width: parent.width
+                                        spacing: 0
+                                        property var parentCategory: modelData
+                                        
+                                        Repeater {
+                                            model: parentCategory.categories
+                                            delegate: Column {
+                                                width: parent.width
+                                                spacing: 0
+                                                property var subCategory: modelData
+                                                property string catName: parentCategory.name + " - " + subCategory.name
+                                                property var catEmojis: subCategory.emoticons
+                                                
+                                                property var filteredEmojis: {
+                                                    let cf = kaomojiView.currentFilter.toLowerCase().trim();
+                                                    if (cf === "") return catEmojis;
+                                                    let res = [];
+                                                    for (let i = 0; i < catEmojis.length; i++) {
+                                                        if (catEmojis[i].toLowerCase().indexOf(cf) !== -1) {
+                                                            res.push(catEmojis[i]);
+                                                        }
+                                                    }
+                                                    return res;
+                                                }
+                                                
+                                                visible: filteredEmojis.length > 0
+                                                
+                                                Item {
+                                                    id: kaomojiCatHeader
+                                                    width: parent.width
+                                                    height: 32
+                                                    property bool isExpanded: kaomojiView.categoryStates[catName] !== false
+                                                    visible: (!kaomojiView.activeStickyInfo || kaomojiView.activeStickyInfo.catName !== catName || kaomojiView.activeStickyInfo.offset < 0)
+
+                                                    Rectangle {
+                                                        anchors.fill: parent
+                                                        color: kaomojiCatHeaderMouse.pressed ? Kirigami.Theme.highlightColor : (kaomojiCatHeaderMouse.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                                        border.color: (kaomojiCatHeaderMouse.pressed || kaomojiCatHeaderMouse.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                                        border.width: 1
+                                                        radius: 4
+                                                    }
+
+                                                    RowLayout {
+                                                        anchors.fill: parent
+                                                        anchors.leftMargin: 8
+                                                        anchors.rightMargin: 8
+                                                        spacing: 8
+
+                                                        Item {
+                                                            implicitWidth: 16
+                                                            implicitHeight: 16
+                                                            Kirigami.Icon {
+                                                                anchors.centerIn: parent
+                                                                source: kaomojiCatHeader.isExpanded ? "go-down" : "go-next"
+                                                                width: 16
+                                                                height: 16
+                                                            }
+                                                        }
+
+                                                        PlasmaComponents.Label {
+                                                            text: catName
+                                                            font.bold: true
+                                                            font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                                        }
+                                                        
+                                                        Rectangle {
+                                                             Layout.fillWidth: true
+                                                             height: 1
+                                                             color: Kirigami.Theme.textColor
+                                                             opacity: 0.3
+                                                         }
+                                                    }
+
+                                                    MouseArea {
+                                                        id: kaomojiCatHeaderMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: function(mouse) {
+                                                            if (mouse.button === Qt.LeftButton) {
+                                                                kaomojiView.toggleCategory(catName);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                Flow {
+                                                    width: parent.width
+                                                    spacing: 4
+                                                    visible: kaomojiCatHeader.isExpanded
+                                                    
+                                                    Repeater {
+                                                        model: filteredEmojis
+                                                        delegate: Item {
+                                                            property string kaomojiText: modelData
+                                                            width: kaomojiLabel.implicitWidth + 16
+                                                            height: 36
+
+                                                            Rectangle {
+                                                                anchors.fill: parent
+                                                                anchors.margins: 2
+                                                                color: Kirigami.Theme.highlightColor
+                                                                radius: 4
+                                                                opacity: kaomojiMouseArea.pressed ? 1.0 : (kaomojiMouseArea.containsMouse ? 0.2 : 0)
+                                                            }
+                                                            Rectangle {
+                                                                anchors.fill: parent
+                                                                anchors.margins: 2
+                                                                color: "transparent"
+                                                                radius: 4
+                                                                border.width: (kaomojiMouseArea.pressed || kaomojiMouseArea.containsMouse) ? 2 : 0
+                                                                border.color: Kirigami.Theme.highlightColor
+                                                            }
+
+                                                            PlasmaComponents.Label {
+                                                                id: kaomojiLabel
+                                                                anchors.centerIn: parent
+                                                                text: kaomojiText
+                                                                font.pixelSize: Math.floor(fullRoot.internalGridSize * 0.4)
+                                                                renderType: Text.NativeRendering
+                                                            }
+
+                                                            MouseArea {
+                                                                id: kaomojiMouseArea
+                                                                anchors.fill: parent
+                                                                hoverEnabled: true
+                                                                acceptedButtons: Qt.LeftButton
+                                                                cursorShape: Qt.PointingHandCursor
+                                                                
+                                                                onEntered: {
+                                                                    fullRoot.emojiHoveredEmojiKey = kaomojiText;
+                                                                    fullRoot.hoveredEmojiName = catName;
+                                                                    fullRoot.emojiHoveredEmojiType = "kaomoji";
+                                                                }
+
+                                                                onExited: {
+                                                                    if (fullRoot.emojiHoveredEmojiKey === kaomojiText) {
+                                                                        fullRoot.emojiLastHoveredEmojiKey = kaomojiText;
+                                                                    }
+                                                                }
+
+                                                                onClicked: function(mouse) {
+                                                                    handleEmojiSelected(kaomojiText, false, false, false);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         ScrollView {
                             id: allEmojisView
                             anchors.fill: parent
@@ -4399,6 +4633,90 @@ PlasmoidItem {
                         }
 
                         Item {
+                            
+                        // Floating sticky header for Kaomoji
+                        Item {
+                            id: floatingStickyHeaderKaomoji
+                            anchors.left: kaomojiView.left
+                            anchors.right: kaomojiView.right
+                            anchors.rightMargin: kaomojiView.ScrollBar.vertical.visible ? kaomojiView.ScrollBar.vertical.width : 0
+                            height: 32
+                            y: kaomojiView.activeStickyInfo ? kaomojiView.activeStickyInfo.offset : 0
+                            z: 10
+                            
+                            visible: kaomojiView.visible && kaomojiView.activeStickyInfo !== null
+                            
+                            readonly property var info: kaomojiView.activeStickyInfo
+                            property string catName: info ? info.catName : ""
+                            property bool isExpanded: info ? info.isExpanded : false
+                            property int count: info ? info.count : 0
+                            
+                            Rectangle {
+                                anchors.fill: parent
+                                color: Kirigami.Theme.backgroundColor
+                                opacity: 0.95
+                            }
+                            
+                            Rectangle {
+                                anchors.fill: parent
+                                color: stickyHeaderMouseKaomoji.pressed ? Kirigami.Theme.highlightColor : (stickyHeaderMouseKaomoji.containsMouse ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.1) : "transparent")
+                                border.color: (stickyHeaderMouseKaomoji.pressed || stickyHeaderMouseKaomoji.containsMouse) ? Kirigami.Theme.highlightColor : "transparent"
+                                border.width: 1
+                                radius: 4
+                            }
+                            
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                spacing: 8
+                                
+                                Item {
+                                    implicitWidth: 16
+                                    implicitHeight: 16
+                                    Kirigami.Icon {
+                                        anchors.centerIn: parent
+                                        source: floatingStickyHeaderKaomoji.isExpanded ? "go-down" : "go-next"
+                                        width: 16
+                                        height: 16
+                                    }
+                                }
+                                
+                                PlasmaComponents.Label {
+                                    text: floatingStickyHeaderKaomoji.catName
+                                    font.bold: true
+                                    font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.05
+                                }
+                                
+                                PlasmaComponents.Label {
+                                    text: floatingStickyHeaderKaomoji.count
+                                    font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 0.9
+                                    color: Kirigami.Theme.disabledTextColor
+                                }
+                                
+                                Rectangle {
+                                     Layout.fillWidth: true
+                                     height: 1
+                                     color: Kirigami.Theme.textColor
+                                     opacity: 0.3
+                                 }
+                            }
+                            
+                            MouseArea {
+                                id: stickyHeaderMouseKaomoji
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: function(mouse) {
+                                    if (mouse.button === Qt.LeftButton && floatingStickyHeaderKaomoji.catName !== "") {
+                                        kaomojiView.toggleCategory(floatingStickyHeaderKaomoji.catName);
+                                    }
+                                }
+                            }
+                        }
+
+                        Item {
                             id: floatingStickyHeader
                             x: 0
                             y: allEmojisView.activeStickyInfo ? allEmojisView.activeStickyInfo.offset : 0
@@ -5006,7 +5324,7 @@ PlasmoidItem {
                             font.pixelSize: fontSizeEmptyLabel
                             color: Kirigami.Theme.textColor
                             opacity: 0.6
-                            visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.selectedCategory !== fullRoot.catEmojiKitchen && fullRoot.filteredEmojis.length === 0
+                            visible: fullRoot.selectedCategory !== fullRoot.catGifs && fullRoot.selectedCategory !== fullRoot.catEmojiKitchen && fullRoot.selectedCategory !== fullRoot.catKaomoji && fullRoot.filteredEmojis.length === 0
                         }
                     }
                 }
